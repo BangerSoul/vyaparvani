@@ -144,8 +144,9 @@ await test("Playwright M3 UI flows: Wispr/Hands-free defaults, stock deduction, 
     await guptaCard.waitFor({ timeout: 10000 });
     await guptaCard.getByRole("button", { name: "Confirm & save" }).click();
 
-    await page.getByText("Low stock: surf (1 packet bacha)").waitFor({ timeout: 5000 });
-    const reorderHref = await page.getByRole("link", { name: "Reorder on WhatsApp" }).getAttribute("href");
+    const stockPulse = page.getByLabel("Stock pulse");
+    await stockPulse.getByText("Low stock: surf (1 packet bacha)", { exact: true }).waitFor({ timeout: 5000 });
+    const reorderHref = await stockPulse.getByRole("link", { name: "Reorder on WhatsApp" }).getAttribute("href");
     assert.ok(reorderHref && reorderHref.startsWith("https://wa.me/?text="));
 
     // Confirmed EntryCard WhatsApp slip + Distributor CSV buttons
@@ -157,18 +158,18 @@ await test("Playwright M3 UI flows: Wispr/Hands-free defaults, stock deduction, 
     // Khata (Parties) tab net balance + Wasooli record karo
     await page.getByRole("tab", { name: "Khata (Parties)" }).click();
     const khataCard = page.locator("article", { hasText: "Gupta Store" }).first();
-    await khataCard.getByText("₹200 baki").waitFor({ timeout: 5000 });
+    await khataCard.getByText("₹200 baki", { exact: true }).waitFor({ timeout: 5000 });
     const khataWaHref = await khataCard.getByRole("link", { name: "WhatsApp pe bhejein" }).getAttribute("href");
     assert.ok(khataWaHref && khataWaHref.startsWith("https://wa.me/?text="));
 
     await khataCard.getByRole("button", { name: "Wasooli record karo" }).click();
-    await khataCard.getByText("Settled").waitFor({ timeout: 5000 });
+    await khataCard.getByText("Settled", { exact: true }).waitFor({ timeout: 5000 });
 
     // Voice restock clears low-stock surf alert
     await input.fill("5 packet surf stock mein add karo");
     await submitBtn.click();
-    await page.getByText("Stock updated:", { exact: false }).waitFor({ timeout: 10000 });
-    const lowCount = await page.getByText("Low stock: surf", { exact: false }).count();
+    await page.getByText("Stock updated:", { exact: false }).first().waitFor({ timeout: 10000 });
+    const lowCount = await stockPulse.getByText("Low stock: surf", { exact: false }).count();
     assert.equal(lowCount, 0);
   } finally {
     await browser.close();
