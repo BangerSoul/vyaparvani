@@ -60,8 +60,8 @@ jobs:
           echo "$EVAL_OUT" | grep -q "26/26 exact-match" || { echo "Golden eval failed (< 26/26)"; exit 1; }
           node scripts/test-p0.mjs http://127.0.0.1:3000
 
-          npm install --no-save playwright@1.52.0
-          npx playwright install --with-deps chromium
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium || (npx playwright install chromium && sudo apt-get update -qq && sudo apt-get install -y -qq libnss3 libnspr4 libatk1.0-0t64 libatk-bridge2.0-0t64 libcups2t64 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libasound2t64)
           node scripts/capture-ui.mjs http://127.0.0.1:3000 decks/assets/ui-screenshot.png
 
       - name: Upload UI screenshot artifact
