@@ -6,8 +6,16 @@ export const entryItemSchema = z.object({
   unit: z.string().default(""),
 });
 
+export const ledgerActionSchema = z
+  .enum(["credit_given", "payment_received"])
+  .nullable()
+  .default(null);
+
+export type LedgerAction = z.infer<typeof ledgerActionSchema>;
+
 export const parsedEntrySchema = z.object({
   type: z.enum(["order", "ledger"]),
+  ledgerAction: ledgerActionSchema,
   items: z.array(entryItemSchema).default([]),
   party: z.string().default(""),
   dueDate: z.string().default(""),
@@ -61,6 +69,7 @@ Rules:
 - Use the glossary of local units and terms provided.
 - Never invent a quantity, product or party that is not in the utterance. If a quantity is missing for an item, include the item with quantity 0 and list "quantity" or "items" in "missing".
 - For ledger entries, require a party/customer name; if missing, list "party" in "missing".
+- ledgerAction: set to "credit_given" for udhaar/credit/baki given or owed (including mixed order+udhaar with explicit credit wording), "payment_received" for wasooli/jama/clear/collection/chukta received, and null for plain or price-denominated orders (e.g. "50 rupaye ka chawal Gupta store ko bhej do").
 - Set confidence below 0.6 when any word is ambiguous, a quantity is missing, or the party is unclear.
 - When confidence is below 0.6, write one short Hinglish clarifying question in "clarification" (e.g. "Kitne kg chawal bhejne hain?").
 - dueDate: ISO YYYY-MM-DD resolved from Today (${istTodayIso} IST) if a relative date like "aaj" (+0d), "kal" (+1d), or "parso" (+2d) is stated, else "".

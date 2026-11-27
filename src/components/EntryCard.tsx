@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { Entry } from "@/lib/store";
-import type { EntryItem } from "@/lib/schema";
+import type { EntryItem, LedgerAction } from "@/lib/schema";
 
 type Props = {
   entry: Entry;
@@ -15,6 +15,7 @@ type Props = {
 
 type EditDraft = {
   type: "order" | "ledger";
+  ledgerAction: LedgerAction;
   party: string;
   items: EntryItem[];
   amount: number | null;
@@ -56,6 +57,7 @@ export default function EntryCard({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<EditDraft>({
     type: entry.type,
+    ledgerAction: entry.ledgerAction ?? (entry.type === "ledger" ? "credit_given" : null),
     party: entry.party,
     items: entry.items.map((it) => ({ ...it })),
     amount: entry.amount,
@@ -67,6 +69,7 @@ export default function EntryCard({
   function beginEdit() {
     setDraft({
       type: entry.type,
+      ledgerAction: entry.ledgerAction ?? (entry.type === "ledger" ? "credit_given" : null),
       party: entry.party,
       items: entry.items.map((it) => ({ ...it })),
       amount: entry.amount,
@@ -85,8 +88,15 @@ export default function EntryCard({
       }));
     const normalizedAmount =
       draft.amount !== null && Number.isFinite(draft.amount) ? draft.amount : null;
+    const normalizedAction: LedgerAction =
+      draft.type === "ledger"
+        ? draft.ledgerAction ?? "credit_given"
+        : normalizedAmount !== null && normalizedAmount > 0
+          ? draft.ledgerAction
+          : null;
     const cleaned: EditDraft = {
       type: draft.type,
+      ledgerAction: normalizedAction,
       party: draft.party.trim(),
       items: cleanedItems,
       amount: normalizedAmount,
@@ -134,6 +144,20 @@ export default function EntryCard({
           >
             {entry.type === "order" ? "Order" : "Udhaar / khata"}
           </span>
+          {entry.ledgerAction && (
+            <span
+              className={[
+                "rounded-full px-2.5 py-0.5 text-xs font-semibold",
+                entry.ledgerAction === "payment_received"
+                  ? "bg-[#E5F0E4] text-[#2E6B2E]"
+                  : "bg-[#FBF1E3] text-saffronDeep",
+              ].join(" ")}
+            >
+              {entry.ledgerAction === "payment_received"
+                ? "Wasooli / Jama (-₹)"
+                : "Udhaar diya (+₹)"}
+            </span>
+          )}
           {entry.status === "confirmed" ? (
             <span className="rounded-full bg-[#E5F0E4] px-2.5 py-0.5 text-xs font-semibold text-[#2E6B2E]">
               Confirmed
@@ -172,11 +196,16 @@ export default function EntryCard({
 
       {editing ? (
         <div className="mt-3 space-y-3">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm font-medium text-inkSoft">Type:</span>
             <button
               type="button"
-              onClick={() => setDraft((d) => ({ ...d, type: "order" }))}
+              onClick={() =>
+                setDraft((d) => ({
+                  ...d,
+                  type: "order",
+                }))
+              }
               className={[
                 "rounded-card border px-3 py-1 text-xs font-semibold",
                 draft.type === "order"
@@ -188,7 +217,13 @@ export default function EntryCard({
             </button>
             <button
               type="button"
-              onClick={() => setDraft((d) => ({ ...d, type: "ledger" }))}
+              onClick={() =>
+                setDraft((d) => ({
+                  ...d,
+                  type: "ledger",
+                  ledgerAction: d.ledgerAction ?? "credit_given",
+                }))
+              }
               className={[
                 "rounded-card border px-3 py-1 text-xs font-semibold",
                 draft.type === "ledger"
@@ -199,6 +234,50 @@ export default function EntryCard({
               Udhaar / khata
             </button>
           </div>
+
+          {(draft.type === "ledger" || (draft.amount !== null && draft.amount > 0) || draft.ledgerAction !== null) && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-medium text-inkSoft">Khata direction:</span>
+              <button
+                type="button"
+                onClick={() => setDraft((d) => ({ ...d, ledgerAction: "credit_given" }))}
+                className={[
+                  "rounded-card border px-3 py-1 text-xs font-semibold",
+                  draft.ledgerAction === "credit_given"
+                    ? "border-saffronDeep bg-saffronDeep text-white"
+                    : "border-line bg-surface text-inkSoft",
+                ].join(" ")}
+              >
+                Udhaar diya (+₹)
+              </button>
+              <button
+                type="button"
+                onClick={() => setDraft((d) => ({ ...d, ledgerAction: "payment_received" }))}
+                className={[
+                  "rounded-card border px-3 py-1 text-xs font-semibold",
+                  draft.ledgerAction === "payment_received"
+                    ? "border-[#2E6B2E] bg-[#2E6B2E] text-white"
+                    : "border-line bg-surface text-inkSoft",
+                ].join(" ")}
+              >
+                Wasooli / Jama (-₹)
+              </button>
+              {draft.type === "order" && (
+                <button
+                  type="button"
+                  onClick={() => setDraft((d) => ({ ...d, ledgerAction: null }))}
+                  className={[
+                    "rounded-card border px-3 py-1 text-xs font-semibold",
+                    draft.ledgerAction === null
+                      ? "border-ink bg-ink text-white"
+                      : "border-line bg-surface text-inkSoft",
+                  ].join(" ")}
+                >
+                  Price only
+                </button>
+              )}
+            </div>
+          )}
 
           <label className="block text-sm">
             <span className="font-medium text-inkSoft">Party / dukaan</span>

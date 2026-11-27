@@ -3,7 +3,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import MicControl from "@/components/MicControl";
 import EntryCard from "@/components/EntryCard";
-import { loadEntries, saveEntries, toDraft, type Entry } from "@/lib/store";
+import {
+  buildWasooliEntry,
+  computePartyBalances,
+  loadEntries,
+  saveEntries,
+  toDraft,
+  type Entry,
+} from "@/lib/store";
 import type { ParsedEntry } from "@/lib/schema";
 import {
   WebSpeechAdapter,
@@ -40,7 +47,8 @@ export default function Home() {
   const [status, setStatus] = useState<Status>("idle");
   const [errorMsg, setErrorMsg] = useState("");
   const [toast, setToast] = useState("");
-  const [filter, setFilter] = useState<"all" | "order" | "ledger">("all");
+  const [filter, setFilter] = useState<"all" | "order" | "ledger" | "khata">("all");
+  const [selectedPartyKey, setSelectedPartyKey] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const [hasServerKey, setHasServerKey] = useState(false);
   const [apiKey, setApiKey] = useState("");
@@ -144,12 +152,20 @@ export default function Home() {
     return () => clearTimeout(t);
   }, [toast]);
 
+  const partyBalances = useMemo(() => computePartyBalances(entries), [entries]);
+
   const filtered = useMemo(
     () =>
       entries
-        .filter((e) => filter === "all" || e.type === filter)
+        .filter((e) => {
+          if (filter !== "all" && filter !== "khata" && e.type !== filter) return false;
+          if (selectedPartyKey && (e.party || "").trim().toLowerCase() !== selectedPartyKey) {
+            return false;
+          }
+          return true;
+        })
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
-    [entries, filter],
+    [entries, filter, selectedPartyKey],
   );
 
   const readTyped = () => (textRef.current?.value || "").trim();
@@ -167,6 +183,7 @@ export default function Home() {
             utterance,
             existingEntry: {
               type: activeClarify.type,
+              ledgerAction: activeClarify.ledgerAction,
               items: activeClarify.items,
               party: activeClarify.party,
               dueDate: activeClarify.dueDate,
@@ -201,6 +218,8 @@ export default function Home() {
               ? {
                   ...e,
                   type: patched.type,
+                  ledgerAction:
+                    patched.ledgerAction ?? (patched.type === "ledger" ? "credit_given" : null),
                   items: patched.items,
                   party: patched.party,
                   dueDate: patched.dueDate,
@@ -564,10 +583,10 @@ export default function Home() {
 
       {/* Entries */}
       <section className="mt-10" aria-label="Entries">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-xl font-bold text-ink">Aaj ki entries</h2>
-          <div role="tablist" aria-label="Filter entries" className="flex gap-1 rounded-card border border-line bg-card p-1">
-            {(["all", "order", "ledger"] as const).map((f) => (
+          <div role="tablist" aria-label="Filter entries" className="flex flex-wrap gap-1 rounded-card border border-line bg-card p-1">
+            {(["all", "order", "ledger", "khata"] as const).map((f) => (
               <button
                 key={f}
                 role="tab"
@@ -578,11 +597,33 @@ export default function Home() {
                   filter === f ? "bg-ink text-white" : "text-inkSoft hover:bg-surface",
                 ].join(" ")}
               >
-                {f === "all" ? "Sab" : f === "order" ? "Orders" : "Udhaar"}
+                {f === "all"
+                  ? "Sab"
+                  : f === "order"
+                    ? "Orders"
+                    : f === "ledger"
+                      ? "Udhaar"
+                      : "Khata (Parties)"}
               </button>
             ))}
           </div>
         </div>
+
+        {selectedPartyKey && filter !== "khata" && (
+          <div className="mt-3 flex items-center gap-2">
+            <span className="inline-flex items-center gap-2 rounded-full border border-saffron bg-[#FBF1E3] px-3 py-1 text-xs font-semibold text-saffronDeep">
+              Party filter: {partyBalances.find((p) => p.partyKey === selectedPartyKey)?.party ?? selectedPartyKey}
+              <button
+                type="button"
+                aria-label="Clear party filter"
+                onClick={() => setSelectedPartyKey(null)}
+                className="font-bold hover:opacity-75"
+              >
+                ×
+              </button>
+            </span>
+          </div>
+        )}
 
         {status === "parsing" && (
           <p className="mt-4 rounded-card border border-line bg-card p-4 text-sm text-inkSoft" role="status">
@@ -590,7 +631,77 @@ export default function Home() {
           </p>
         )}
 
-        {!hydrated ? null : filtered.length === 0 ? (
+        {!hydrated ? null : filter === "khata" ? (
+          partyBalances.length === 0 ? (
+            <div className="mt-4 rounded-card border border-dashed border-line bg-card p-8 text-center">
+              <p className="text-base font-semibold text-ink">Abhi kisi party ka confirmed khata nahi hai.</p>
+              <p className="mt-1 text-sm text-inkSoft">
+                Udhaar ya wasooli entry confirm karne par party-wise net balance yahan dikhega.
+              </p>
+            </div>
+          ) : (
+            <div className="mt-4 space-y-3">
+              {partyBalances.map((summary) => (
+                <article
+                  key={summary.partyKey}
+                  aria-label={`Khata summary for ${summary.party}`}
+                  className="rounded-card border border-line bg-card p-4 shadow-sm"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <h3 className="text-base font-bold text-ink">{summary.party}</h3>
+                      <p className="mt-0.5 text-xs text-inkSoft">
+                        Udhaar diya: ₹{summary.creditTotal} • Wasooli: ₹{summary.paidTotal} •{" "}
+                        {summary.entryCount} confirmed
+                      </p>
+                    </div>
+                    <span
+                      className={[
+                        "rounded-full px-3 py-1 text-xs font-bold",
+                        summary.netBalance > 0
+                          ? "bg-[#FBF1E3] text-saffronDeep"
+                          : summary.netBalance === 0
+                            ? "bg-[#E5F0E4] text-[#2E6B2E]"
+                            : "bg-[#EEF3EC] text-ink",
+                      ].join(" ")}
+                    >
+                      {summary.netBalance > 0
+                        ? `₹${summary.netBalance} baki`
+                        : summary.netBalance === 0
+                          ? "Settled"
+                          : `₹${Math.abs(summary.netBalance)} advance`}
+                    </span>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedPartyKey(summary.partyKey);
+                        setFilter("all");
+                      }}
+                      className="rounded-card border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink hover:bg-[#F3EDE0]"
+                    >
+                      Entries dekhein
+                    </button>
+                    {summary.netBalance > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const wasooli = buildWasooliEntry(summary.party, summary.netBalance);
+                          setEntries((prev) => [wasooli, ...prev]);
+                          setToast(`${summary.party} ka ₹${summary.netBalance} wasooli record ho gaya.`);
+                        }}
+                        className="rounded-card bg-ink px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90"
+                      >
+                        Wasooli record karo
+                      </button>
+                    )}
+                  </div>
+                </article>
+              ))}
+            </div>
+          )
+        ) : filtered.length === 0 ? (
           <div className="mt-4 rounded-card border border-dashed border-line bg-card p-8 text-center">
             <p className="text-base font-semibold text-ink">Abhi koi entry nahi hai.</p>
             <p className="mt-1 text-sm text-inkSoft">

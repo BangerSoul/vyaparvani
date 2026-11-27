@@ -25,9 +25,17 @@ const UNITS = new Set([
   "litre", "litres", "ltr",
 ]);
 
+const PAYMENT_RECEIVED_WORDS = new Set([
+  "wasooli", "jama", "clear", "collection", "mila", "chukta",
+]);
+
+const CREDIT_GIVEN_WORDS = new Set([
+  "udhaar", "udhar", "baki", "credit", "lena", "dena",
+]);
+
 const LEDGER_INTENT_WORDS = new Set([
   "udhaar", "udhar", "khata", "baki", "jama", "wasooli",
-  "credit", "collection", "lena", "dena",
+  "credit", "collection", "lena", "dena", "chukta",
 ]);
 
 const CURRENCY_WORDS = new Set([
@@ -344,6 +352,26 @@ function extractPartySpan(tokens: string[]): { party: string; span: [number, num
   return { party: "", span: null };
 }
 
+function inferLedgerAction(
+  tokens: string[],
+  type: "order" | "ledger",
+  amount: number | null,
+): ParsedEntry["ledgerAction"] {
+  if (tokens.some((t) => PAYMENT_RECEIVED_WORDS.has(t))) {
+    return "payment_received";
+  }
+  if (
+    tokens.some((t) => CREDIT_GIVEN_WORDS.has(t)) &&
+    (type === "ledger" || amount !== null)
+  ) {
+    return "credit_given";
+  }
+  if (type === "ledger") {
+    return "credit_given";
+  }
+  return null;
+}
+
 function normalizeUnit(u: string): string {
   if (u === "kgs") return "kg";
   if (u === "kilos") return "kilo";
@@ -488,6 +516,7 @@ export function parseDemo(input: string): ParsedEntry {
   if (amountTokens.length > 0) amount = amountTokens[0];
 
   const type = items.length > 0 ? "order" : (hasLedgerIntent || (amount !== null && hasCurrency)) ? "ledger" : "order";
+  const ledgerAction = inferLedgerAction(tokensAll, type, amount);
 
   let confidence = 0.75;
   if (items.length === 0 && amount === null) {
@@ -529,6 +558,7 @@ export function parseDemo(input: string): ParsedEntry {
 
   return parsedEntrySchema.parse({
     type,
+    ledgerAction,
     items,
     party,
     dueDate,
@@ -598,6 +628,12 @@ export function mergeDemoClarification(
   const replyTokens = preprocessTokens(utterance).filter((t) => !TIME_WORDS.has(t));
 
   let type: "order" | "ledger" = existing.type === "ledger" ? "ledger" : "order";
+  let ledgerAction: ParsedEntry["ledgerAction"] =
+    existing.ledgerAction === "credit_given" || existing.ledgerAction === "payment_received"
+      ? existing.ledgerAction
+      : type === "ledger"
+        ? "credit_given"
+        : null;
   let items: ParsedEntry["items"] = Array.isArray(existing.items)
     ? existing.items.map((it) => ({ ...it }))
     : [];
@@ -697,6 +733,13 @@ export function mergeDemoClarification(
     dueDate = replyParsed.dueDate;
   }
 
+  // 4b. Preserve or refine ledgerAction from reply
+  if (replyParsed.ledgerAction) {
+    ledgerAction = replyParsed.ledgerAction;
+  } else if (type === "ledger" && ledgerAction === null) {
+    ledgerAction = inferLedgerAction(replyTokens, type, amount);
+  }
+
   // 5. Recompute missing, confidence, clarification cleanly
   const missing: string[] = [];
   if (type === "order" && items.length === 0 && amount === null) {
@@ -734,6 +777,7 @@ export function mergeDemoClarification(
 
   return parsedEntrySchema.parse({
     type,
+    ledgerAction,
     items,
     party,
     dueDate,
