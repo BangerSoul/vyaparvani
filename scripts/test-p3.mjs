@@ -58,7 +58,8 @@ await test("REC-13: html[lang='hi-Latn'], saveKey sk- validation + Enter submit,
     await apiKeyInput.fill("sk-validtestkey123");
     assert.equal(await page.locator("#api-key-error").count(), 0);
     await apiKeyInput.press("Enter");
-    await page.getByText("API key set — ab real model se parsing hogi.").waitFor({ timeout: 5000 });
+    await page.getByRole("button", { name: "Key hatayein" }).waitFor({ timeout: 5000 });
+    await page.locator("p", { hasText: "API key set — ab real model se parsing hogi." }).waitFor({ timeout: 5000 });
     assert.equal(
       await page.evaluate(() => sessionStorage.getItem("vyaparvani.key")),
       "sk-validtestkey123",
