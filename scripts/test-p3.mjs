@@ -186,8 +186,9 @@ await test("REC-13: edited?: boolean & No-edit accuracy KPI pill (clarify stays 
     const sharmaCard = page.locator("article", { hasText: "Sharma Kirana" }).first();
     await sharmaCard.waitFor({ timeout: 10000 });
     await sharmaCard.getByRole("button", { name: "Edit" }).click();
-    await sharmaCard.getByPlaceholder("Gupta store").fill("Sharma Kirana Edited");
-    await sharmaCard.getByRole("button", { name: "Save edits" }).click();
+    const editingCard = page.locator("article", { hasText: "Save edits" }).first();
+    await editingCard.getByPlaceholder("Gupta store").fill("Sharma Kirana Edited");
+    await editingCard.getByRole("button", { name: "Save edits" }).click();
     const editedCard = page.locator("article", { hasText: "Sharma Kirana Edited" }).first();
     await editedCard.waitFor({ timeout: 5000 });
     await editedCard.getByRole("button", { name: "Confirm & save" }).click();
