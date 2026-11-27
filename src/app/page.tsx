@@ -15,6 +15,17 @@ import {
   buildDistributorCsv,
   buildKhataWhatsAppUrl,
 } from "@/lib/share";
+import {
+  DEFAULT_STOCK,
+  applyOrderStockDeduction,
+  applyRestock,
+  buildReorderWhatsAppUrl,
+  getLowStockItems,
+  loadStock,
+  parseRestockIntent,
+  saveStock,
+  type StockItem,
+} from "@/lib/inventory";
 import type { ParsedEntry } from "@/lib/schema";
 import {
   WebSpeechAdapter,
@@ -47,6 +58,9 @@ const WISPR_SNIPPETS = [
 export default function Home() {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [hydrated, setHydrated] = useState(false);
+  const [stock, setStock] = useState<StockItem[]>([]);
+  const [stockHydrated, setStockHydrated] = useState(false);
+  const [showStockDrawer, setShowStockDrawer] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [status, setStatus] = useState<Status>("idle");
   const [errorMsg, setErrorMsg] = useState("");
@@ -144,11 +158,17 @@ export default function Home() {
   useEffect(() => {
     setEntries(loadEntries());
     setHydrated(true);
+    setStock(loadStock());
+    setStockHydrated(true);
   }, []);
 
   useEffect(() => {
     if (hydrated) saveEntries(entries);
   }, [entries, hydrated]);
+
+  useEffect(() => {
+    if (stockHydrated) saveStock(stock);
+  }, [stock, stockHydrated]);
 
   useEffect(() => {
     if (!toast) return;
@@ -157,6 +177,7 @@ export default function Home() {
   }, [toast]);
 
   const partyBalances = useMemo(() => computePartyBalances(entries), [entries]);
+  const lowStockItems = useMemo(() => getLowStockItems(stock), [stock]);
 
   const confirmedOrderItemsCount = useMemo(
     () =>
@@ -241,6 +262,27 @@ export default function Home() {
       }
       const parsed: { entries: ParsedEntry[]; mode?: "demo" | "model" } = await res.json();
       const mode = parsed.mode === "model" ? "model" : "demo";
+
+      if (!activeClarify && parseRestockIntent(utterance)) {
+        const restockItems = parsed.entries.flatMap((e) => e.items);
+        const { nextStock, updated } = applyRestock(stock, restockItems);
+        setTranscript("");
+        if (textRef.current) {
+          textRef.current.value = "";
+          if (wisprMode) textRef.current.focus();
+        }
+        setStatus("idle");
+        if (updated.length > 0) {
+          setStock(nextStock);
+          const summary = updated
+            .map((u) => `${u.sku} (+${u.added} -> ${u.quantity} ${u.unit})`)
+            .join(", ");
+          setToast(`Stock updated: ${summary}`);
+        } else {
+          setToast("Restock ke liye item aur matra bataiye (jaise '10 kg chawal stock mein add karo').");
+        }
+        return;
+      }
 
       if (activeClarify && parsed.entries.length > 0) {
         const patched = parsed.entries[0];
@@ -327,15 +369,38 @@ export default function Home() {
       setToast("Koi item ya raqam daaliye pehle.");
       return;
     }
+    let lowAlert = "";
+    const shouldDeductStock =
+      entry.type === "order" && entry.items.length > 0 && !entry.stockDeducted;
+    if (shouldDeductStock) {
+      const { nextStock, deducted } = applyOrderStockDeduction(stock, entry.items);
+      if (deducted.length > 0) {
+        setStock(nextStock);
+        const lowDeducted = nextStock.filter(
+          (s) =>
+            s.quantity <= s.lowThreshold &&
+            deducted.some((d) => d.sku === s.sku),
+        );
+        if (lowDeducted.length > 0) {
+          lowAlert = ` Low stock: ${lowDeducted.map((s) => `${s.sku} (${s.quantity} ${s.unit} bacha)`).join(", ")}`;
+        }
+      }
+    }
     setEntries((prev) =>
       prev.map((e) =>
         e.id === id
-          ? { ...e, status: "confirmed", confidence: Math.max(e.confidence, 1), missing: [] }
+          ? {
+              ...e,
+              status: "confirmed",
+              confidence: Math.max(e.confidence, 1),
+              missing: [],
+              stockDeducted: e.stockDeducted || shouldDeductStock,
+            }
           : e,
       ),
     );
     if (clarifyingEntryId === id) setClarifyingEntryId(null);
-    setToast("Entry save ho gayi.");
+    setToast(`Entry save ho gayi.${lowAlert}`);
   }
 
   function clarify(entry: Entry) {
@@ -361,7 +426,7 @@ export default function Home() {
         </h1>
         <p className="mt-3 max-w-xl text-base text-inkSoft">
           Speak naturally in Hinglish — ‘5 kg chawal Gupta store ko bhej do’ — and VyaparVani turns it
-          into a confirmed order or ledger entry. No typing while customers wait.
+          into a confirmed order, khata entry, or local stock update. No typing while customers wait.
         </p>
       </header>
 
@@ -612,6 +677,116 @@ export default function Home() {
           </p>
         )}
       </section>
+
+      {/* Lightweight Stock / Low-Stock Pulse */}
+      {stockHydrated && (
+        <section
+          aria-label="Stock pulse"
+          className="mt-6 rounded-card border border-line bg-card p-4 shadow-sm"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-sm font-bold text-ink">Stock Pulse</h2>
+              <span className="rounded-full bg-surface px-2.5 py-0.5 text-xs text-inkSoft">
+                {stock.length} SKUs tracked
+              </span>
+              {lowStockItems.map((item) => (
+                <span
+                  key={item.sku}
+                  className="rounded-full border border-saffron bg-[#FBF1E3] px-2.5 py-0.5 text-xs font-semibold text-saffronDeep"
+                >
+                  Low stock: {item.sku} ({item.quantity} {item.unit} bacha)
+                </span>
+              ))}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {lowStockItems.length > 0 && (
+                <a
+                  href={buildReorderWhatsAppUrl(lowStockItems)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-card border border-[#2E6B2E]/30 bg-[#E5F0E4] px-3 py-1 text-xs font-semibold text-[#2E6B2E] hover:opacity-90"
+                >
+                  Reorder on WhatsApp
+                </a>
+              )}
+              <button
+                type="button"
+                aria-expanded={showStockDrawer}
+                onClick={() => setShowStockDrawer((v) => !v)}
+                className="rounded-card border border-line bg-surface px-3 py-1 text-xs font-semibold text-ink hover:bg-[#F3EDE0]"
+              >
+                {showStockDrawer ? "Hide stock" : "Manage stock"}
+              </button>
+            </div>
+          </div>
+
+          {showStockDrawer && (
+            <div className="mt-3 border-t border-line pt-3">
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs text-inkSoft">
+                <span>
+                  Order confirm karne par stock automatically kam hota hai; voice restock ke liye
+                  boliye: “10 kg chawal stock mein add karo”.
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStock(DEFAULT_STOCK.map((s) => ({ ...s })));
+                    setToast("Default kirana stock reset ho gaya.");
+                  }}
+                  className="rounded border border-line bg-surface px-2 py-1 font-semibold text-ink hover:bg-[#F3EDE0]"
+                >
+                  Reset stock
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {stock.map((item) => {
+                  const isLow = item.quantity <= item.lowThreshold;
+                  return (
+                    <div
+                      key={item.sku}
+                      className={[
+                        "rounded-card border p-2.5 text-xs",
+                        isLow
+                          ? "border-saffron bg-[#FBF1E3]"
+                          : "border-line bg-surface",
+                      ].join(" ")}
+                    >
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="font-semibold text-ink">{item.sku}</span>
+                        {isLow && (
+                          <span className="rounded bg-saffron px-1.5 py-0.5 text-[10px] font-bold text-white">
+                            Low
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-1 text-sm font-bold text-ink">
+                        {item.quantity} {item.unit}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setStock((prev) =>
+                            prev.map((s) =>
+                              s.sku === item.sku
+                                ? { ...s, quantity: Number((s.quantity + 5).toFixed(3)) }
+                                : s,
+                            ),
+                          );
+                          setToast(`${item.sku} mein +5 ${item.unit} add hua.`);
+                        }}
+                        className="mt-2 w-full rounded border border-line bg-white px-2 py-1 font-semibold text-ink hover:bg-[#F3EDE0]"
+                      >
+                        +5 {item.unit}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Entries */}
       <section className="mt-10" aria-label="Entries">

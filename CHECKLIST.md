@@ -1,8 +1,8 @@
 # VyaparVani — Resumable P0–P3 Implementation Checklist
 
-- **Last Updated**: 2026-11-27T16:17:00Z
-- **Current Milestone**: M3 IN PROGRESS — `REC-06`–`REC-08` complete, proceeding to `REC-09`
-- **Next Resumable Step**: M3 — Implement `REC-09` (stock), `REC-10` (Hands-free + TTS + M3 CI smoke)
+- **Last Updated**: 2026-11-27T16:22:00Z
+- **Current Milestone**: M3 IN PROGRESS — `REC-06`–`REC-09` complete, proceeding to `REC-10`
+- **Next Resumable Step**: M3 — Implement `REC-10` (Hands-free + `hi-IN` TTS + `scripts/test-m3.mjs` CI gate)
 - **Repository Branch**: `feat/round2-submission` (branched from `master` @ `42448d4`)
 
 ---
@@ -85,8 +85,8 @@
 - [x] Add `Distributor Order Sheet (CSV)` export/copy action in `src/app/page.tsx` aggregating confirmed orders
 
 ### REC-09: Lightweight Voice-Driven Stock Deduction & Low-Stock Alerts
-- [ ] Create `src/lib/inventory.ts` with `localStorage`-persisted common kirana SKUs, order confirmation stock deduction, voice restock parsing/handling, and low-stock threshold alerts
-- [ ] Integrate stock view/alerts and low-stock reorder pulse into `src/app/page.tsx` (ensuring copy matches shipped scope 100%)
+- [x] Create `src/lib/inventory.ts` with `localStorage`-persisted common kirana SKUs, order confirmation stock deduction, voice restock parsing/handling, and low-stock threshold alerts
+- [x] Integrate stock view/alerts and low-stock reorder pulse into `src/app/page.tsx` (ensuring copy matches shipped scope 100%)
 
 ### REC-10: True Hands-Free Mode (Auto-Submit + `hi-IN` TTS Readback)
 - [ ] Add `"Hands-free mode"` toggle in `src/app/page.tsx` / `MicControl.tsx`

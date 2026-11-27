@@ -15,6 +15,7 @@ export type Entry = {
   clarification: string;
   source: string; // original utterance
   mode: "demo" | "model";
+  stockDeducted?: boolean;
 };
 
 export function toDraft(parsed: ParsedEntry, source: string, mode: "demo" | "model"): Entry {

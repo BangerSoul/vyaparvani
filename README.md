@@ -75,6 +75,13 @@ Entries start as drafts. Confirm ("Confirm & save") writes them to
 card. When confidence is low (missing quantity, unclear party), the app asks a
 short Hinglish clarifying question instead of guessing.
 
+Confirming an order also deducts matching kirana SKUs in lightweight local
+stock (`localStorage`, `vyaparvani.stock.v1`), surfaces low-stock alerts with
+a 1-tap distributor WhatsApp reorder link, and supports voice restock
+(e.g. *"10 kg chawal stock mein add karo"*). Confirmed khata entries roll up
+into the `Khata (Parties)` net balance tab with 1-tap `WhatsApp pe bhejein`
+slips and `Distributor Order Sheet (CSV)` export.
+
 ## Eval set
 
 `eval/golden.json` holds 26 golden Hinglish utterances — 21 order, 4 udhaar,
