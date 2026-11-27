@@ -1,8 +1,8 @@
 # VyaparVani — Resumable P0–P3 Implementation Checklist
 
-- **Last Updated**: 2026-11-27T11:15:00Z
-- **Current Milestone**: M1 Implemented -> Verifying via GitHub Actions CI
-- **Next Resumable Step**: Verify M1 CI pass, then start M2 (`REC-05` & Round 2 Req 3.3 Deck Pipeline Rebuild)
+- **Last Updated**: 2026-11-27T11:16:00Z
+- **Current Milestone**: M1 Complete -> Ready for M2 (`REC-05` & Round 2 Req 3.3 Deck Pipeline Rebuild)
+- **Next Resumable Step**: M2 — Capture real UI screenshot (`decks/assets/ui-screenshot.png`) & rebuild `vyaparvani-idea.pdf` via `scripts/build-deck.py`
 - **Repository Branch**: `feat/round2-submission` (branched from `master` @ `42448d4`)
 
 ---
@@ -51,7 +51,7 @@
 - [x] Implement structured field-aware clarification merging in `demo-parser.ts` (patch `missing` fields like `party`, `items`, `quantity`, `product` in place without spawning orphan cards) and in LLM prompt (`route.ts`)
 - [x] Update `EntryCard.tsx` read view to display `amount` (`Purana udhaar / Raqam: ₹...`) on mixed `order`+`udhaar` cards even when `items.length > 0`
 - [x] Update `EntryCard.tsx` edit view to allow editing `Raqam (₹)` on any entry, adding/removing items (`+ Add item` / `× Remove`), toggling `type` (`order` <-> `ledger`), and editing `dueDate`
-- [ ] Verify M1 via GitHub Actions CI (`typecheck`, `build`, `eval`, `docker-build`) + `scripts/test-p0.mjs`
+- [x] Verify M1 via GitHub Actions CI (`typecheck`, `build`, `eval`, `docker-build`) + `scripts/test-p0.mjs` (Run ID `45988574350`: `26/26 exact-match`, `14/14` P0 checks passed, `docker-build` = `success`)
 
 ---
 
