@@ -57,7 +57,7 @@ jobs:
           fi
 
           EVAL_OUT="$(npm run eval -- http://127.0.0.1:3000 | tee /dev/stderr)"
-          echo "$EVAL_OUT" | grep -q "26/26 exact-match" || { echo "Golden eval failed (< 26/26)"; exit 1; }
+          echo "$EVAL_OUT" | grep -q "60/60 exact-match" || { echo "Golden eval failed (< 60/60)"; exit 1; }
           node scripts/test-p0.mjs http://127.0.0.1:3000
 
           npm install --no-save playwright

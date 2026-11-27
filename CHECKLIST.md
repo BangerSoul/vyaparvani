@@ -1,8 +1,8 @@
 # VyaparVani — Resumable P0–P3 Implementation Checklist
 
-- **Last Updated**: 2026-11-27T16:12:00Z
-- **Current Milestone**: M3 Complete (`REC-06`–`REC-10` + `scripts/test-m3.mjs` verified green in CI) -> Ready for M4 (`REC-11`–`REC-14`)
-- **Next Resumable Step**: M4 — Implement `REC-11` (Expand `eval/golden.json` to 50–60 cases & strict `eval-parser.mjs`), `REC-12` (API/Store/Docker hardening), `REC-13` (UX polish & KPI), `REC-14` (90s finale E2E & final PDF sync)
+- **Last Updated**: 2026-11-27T17:03:00Z
+- **Current Milestone**: M4 (`REC-11` Complete -> Next: `REC-12` API/Storage/Standalone Docker Hardening)
+- **Next Resumable Step**: M4 — Implement `REC-12` (`route.ts` cleanup/AbortController/429 backoff/401, `/api/health`, `store.ts` `StorageAdapter` + backup/import, `output: "standalone"` + slim `Dockerfile`), `REC-13`, `REC-14`
 - **Repository Branch**: `feat/round2-submission` (branched from `master` @ `42448d4`)
 
 ---
@@ -98,9 +98,9 @@
 ## M4 — P2–P3 Hardening, Eval 50–60, UX Polish & Finale (`REC-11`–`REC-14`)
 
 ### REC-11: Expanded `eval/golden.json` (50–60 Cases) & Strict Eval + CI Gate
-- [ ] Expand `eval/golden.json` from 26 to 50–60 cases (Devanagari `hi-IN`, zero-qty/nameless-ledger safety, Indian fractions, attached currency `250rs`/`₹500`, price-orders, multi-word parties/items, `ledgerAction`, `dueDate`)
-- [ ] Upgrade `scripts/eval-parser.mjs` to assert full `product` string (not `split(" ")[0]`), `dueDate`, `ledgerAction`, and exit non-zero (`process.exitCode = 1`) on any failure
-- [ ] Document both Demo mode and `gpt-4o-mini` mode eval scores + median/p95 latency in `README.md` and `decks/vyaparvani-idea.deck.json`
+- [x] Expand `eval/golden.json` from 26 to 60 cases (Devanagari `hi-IN`, zero-qty/nameless-ledger/missing-amount safety, Indian fractions, attached currency `250rs`/`₹500`/`500/-`/`5kg`, price-orders, multi-word parties/items, `ledgerAction`, `dueDate`, Devanagari multi-instruction) + fix multi-word branded product truncation & Devanagari words in `src/lib/demo-parser.ts`
+- [x] Upgrade `scripts/eval-parser.mjs` to assert full `product` string (via `normProduct`, not `split(" ")[0]`), `dueDate`, `ledgerAction`, `missingIncludes`, `--llm` (`x-openai-key`), `p50`/`p95` latency, and exit non-zero (`process.exitCode = 1`) on any failure; update `.github/workflows/ci.yml` (`60/60 exact-match`)
+- [x] Document both Demo mode (`60/60 exact-match (100%)`) and wired `gpt-4o-mini` `--llm` mode in `README.md` and `decks/vyaparvani-idea.deck.json`
 
 ### REC-12: API, Storage & Standalone Docker Hardening
 - [ ] Clean unused imports (`z`, `parsedEntrySchema`) in `src/app/api/parse/route.ts`

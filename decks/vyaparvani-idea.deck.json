@@ -21,7 +21,7 @@
       "chips": [
         { "label": "Hinglish + Devanagari", "tone": "accent" },
         { "label": "No-key Demo Mode", "tone": "accent2" },
-        { "label": "26/26 Golden Eval", "tone": "neutral" }
+        { "label": "60/60 Golden Eval", "tone": "neutral" }
       ],
       "notes": "Open with the one-line demo: speak '5 kg chawal Gupta store ko bhej do' and show the confirmed entry."
     },
@@ -89,22 +89,22 @@
     {
       "layout": "chart",
       "title": "The parser is measured, not promised",
-      "body": "26 golden Hinglish utterances (21 order, 4 udhaar, 1 mixed) — 100% exact match across all categories in Demo Regex Eval (median 9 ms, CI-verified). Live gpt-4o-mini path is wired via zod + glossary and awaiting OPENAI_API_KEY benchmark. [1]",
+      "body": "60 golden Hinglish & Devanagari utterances (36 orders, 11 ledger, 4 mixed/multi, 9 safety/clarify) — 100% exact match in Demo Regex Eval (full product, ledgerAction, IST dueDate & p50/p95 latency, CI-verified). Live gpt-4o-mini harness (--llm) is wired via zod + glossary and awaiting OPENAI_API_KEY run. [1]",
       "chart": {
         "type": "bar",
-        "labels": ["Order (n=21)", "Ledger / udhaar (n=4)", "Mixed order+udhaar (n=1)"],
-        "series": [{ "name": "Demo Regex Eval", "values": [100, 100, 100] }],
+        "labels": ["Orders (n=36)", "Ledger / udhaar (n=11)", "Mixed & multi (n=4)", "Safety / clarify (n=9)"],
+        "series": [{ "name": "Demo Regex Eval", "values": [100, 100, 100, 100] }],
         "unit": "% exact-match",
-        "highlight": 2,
+        "highlight": 3,
         "comparison": {
-          "demo": "26/26 (100%), median 9 ms — npm run eval (CI-verified)",
-          "live": "gpt-4o-mini + zod + glossary wired; benchmark pending OPENAI_API_KEY"
+          "demo": "60/60 (100%), p50/p95 reported per run — npm run eval (CI-verified)",
+          "live": "gpt-4o-mini --llm harness wired; benchmark pending live OPENAI_API_KEY"
         }
       },
       "sources": [
-        { "title": "VyaparVani eval run, demo mode, 2026-11-27 (npm run eval)", "url": "https://github.com/BangerSoul/vyaparvani" }
+        { "title": "VyaparVani 60-case eval suite, demo mode, 2026-11-27 (npm run eval)", "url": "https://github.com/BangerSoul/vyaparvani" }
       ],
-      "notes": "26/26 exact-match, median latency 9ms in demo mode (npm run eval, 2026-11-27). These numbers measure the rule-based fallback parser only; the model path is wired and needs an OPENAI_API_KEY to measure."
+      "notes": "60/60 exact-match (100%) in demo mode with p50/p95 latency reporting and non-zero exit code on failure. These numbers measure the rule-based fallback parser only; the gpt-4o-mini --llm path is wired and awaiting a live OPENAI_API_KEY run."
     },
     {
       "layout": "features",
@@ -114,7 +114,7 @@
         { "icon": "cpu", "title": "Structured parsing", "body": "AI SDK + zod, trade glossary, one retry on 429." },
         { "icon": "message", "title": "Clarification, not guessing", "body": "Low confidence gets a Hinglish question." },
         { "icon": "shield", "title": "Runs anywhere", "body": "docker compose up; demo mode needs no key." },
-        { "icon": "gauge", "title": "Regression eval", "body": "26-utterance golden set on every run." }
+        { "icon": "gauge", "title": "Regression eval", "body": "60-utterance golden set on every run." }
       ],
       "notes": "Deck-code match check: every item maps to a shipped file — MicControl (Web Speech), api/parse (AI SDK, zod, glossary, timeout, retry), clarification prompts, Dockerfile + compose, eval/golden.json + scripts/eval-parser.mjs. Edit, delete and confirm sit on every entry card."
     },

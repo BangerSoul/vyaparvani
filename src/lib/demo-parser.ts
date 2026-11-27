@@ -69,7 +69,12 @@ const PRODUCT_FIXES: Record<string, string> = {
   chai: "chai", dove: "dove", surf: "surf", sabun: "sabun (soap)", ghee: "ghee",
   maggi: "maggi", biscuit: "biscuit", biscuits: "biscuit", britannia: "britannia",
   amul: "amul", dudh: "dudh (milk)", milk: "dudh (milk)", agarbatti: "agarbatti",
+  butter: "butter", bread: "bread",
 };
+
+const BRAND_PREFIXES = new Set([
+  "britannia", "amul", "tata", "parle", "aashirvaad", "fortune", "nestle", "dabur", "haldiram",
+]);
 
 const KNOWN_PRODUCTS = new Set(Object.keys(PRODUCT_FIXES));
 
@@ -119,9 +124,10 @@ const DEVANAGARI_WORDS: Record<string, string> = {
   तेल: "tel", नमक: "namak", चाय: "chai", साबुन: "sabun", घी: "ghee",
   दूध: "dudh", बिस्कुट: "biscuit", बिस्किट: "biscuit", सर्फ: "surf",
   मैगी: "maggi", अगरबत्ती: "agarbatti", डव: "dove", अमूल: "amul", ब्रिटानिया: "britannia",
+  बटर: "butter", ब्रेड: "bread", टाटा: "tata", बासमती: "basmati",
   गुप्ता: "gupta", शर्मा: "sharma", मेहता: "mehta", वर्मा: "verma",
   सिंह: "singh", पटेल: "patel", रमेश: "ramesh", सुरेश: "suresh",
-  श्याम: "shyam", रेड्डी: "reddy", नायर: "nair",
+  श्याम: "shyam", रेड्डी: "reddy", नायर: "nair", न्यू: "new",
   स्टोर: "store", किराना: "kirana", शॉप: "shop", ट्रेडर्स: "traders",
   ट्रेडर: "trader", मार्ट: "mart", भैया: "bhaiya", जी: "ji",
   उधार: "udhaar", उधर: "udhaar", खाता: "khata", जमा: "jama",
@@ -141,6 +147,7 @@ const DEVANAGARI_WORDS: Record<string, string> = {
   लिखो: "likho", लिख: "likh", चाहिए: "chahiye", था: "tha",
   थी: "thi", थे: "the", है: "hai", हैं: "hain", हो: "ho",
   गया: "gaya", गई: "gaya", उनका: "unka", मुझे: "mujhe",
+  ऐड: "add", करो: "karo",
 };
 
 const DEV_VOWELS: Record<string, string> = {
@@ -426,6 +433,17 @@ export function parseDemo(input: string): ParsedEntry {
 
     const tok = tokens[i];
 
+    if (
+      BRAND_PREFIXES.has(tok) &&
+      i + 1 < tokens.length &&
+      (KNOWN_PRODUCTS.has(tokens[i + 1]) || (tok === "parle" && tokens[i + 1] === "g")) &&
+      !isPartyLeading(i + 1)
+    ) {
+      lastProduct = `${tok} ${tokens[i + 1]}`;
+      i += 2;
+      continue;
+    }
+
     if (KNOWN_PRODUCTS.has(tok)) {
       lastProduct = PRODUCT_FIXES[tok] ?? tok;
       i++;
@@ -437,7 +455,9 @@ export function parseDemo(input: string): ParsedEntry {
       const { qty, nextIndex, isWord } = consumed;
       const nextTok = nextIndex < tokens.length ? tokens[nextIndex] : "";
       const nextIsUnit = nextIndex < tokens.length && UNITS.has(nextTok);
-      const nextIsProduct = nextIndex < tokens.length && KNOWN_PRODUCTS.has(nextTok);
+      const nextIsProduct =
+        nextIndex < tokens.length &&
+        (KNOWN_PRODUCTS.has(nextTok) || BRAND_PREFIXES.has(nextTok));
       const nextIsMoney =
         nextIndex < tokens.length &&
         (CURRENCY_WORDS.has(nextTok) || LEDGER_INTENT_WORDS.has(nextTok));
@@ -528,9 +548,9 @@ export function parseDemo(input: string): ParsedEntry {
       if (j < tokens.length && !SEPARATORS.has(tokens[j])) {
         const raw = tokens[j];
         if (
-          !KNOWN_PRODUCTS.has(raw) &&
+          (!KNOWN_PRODUCTS.has(raw) || BRAND_PREFIXES.has(raw)) &&
           j + 1 < tokens.length &&
-          KNOWN_PRODUCTS.has(tokens[j + 1]) &&
+          (KNOWN_PRODUCTS.has(tokens[j + 1]) || (raw === "parle" && tokens[j + 1] === "g")) &&
           !isPartyLeading(j) &&
           !isPartyLeading(j + 1) &&
           !UNITS.has(raw) &&

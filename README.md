@@ -84,24 +84,35 @@ slips and `Distributor Order Sheet (CSV)` export.
 
 ## Eval set
 
-`eval/golden.json` holds 26 golden Hinglish utterances — 21 order, 4 udhaar,
-1 mixed order+udhaar — with expected structured entries, including noise cases
-(missing quantity, missing product). Run against a live server:
+`eval/golden.json` holds **60 golden utterances** across Hinglish and Devanagari
+(`hi-IN`):
+- **36** confident orders (including Indian fractions `aadha`/`paav`/`sava`/`dedh`/`dhai`/`saadhe`, attached units `5kg`, price-denominated orders, branded multi-word items like `Britannia biscuits`/`Amul dudh`/`Amul butter`/`Tata namak`/`basmati chawal`, multi-word parties, and IST `dueDate` `aaj`/`kal`/`parso`)
+- **11** confident ledger entries (`credit_given` for `udhaar`/`baki`/`udhaar dena` and `payment_received` for `wasooli`/`jama`/`clear`/`mila`, including attached currency `250rs`/`₹500`/`500/-`)
+- **4** multi-intent entries (**2** mixed `order`+`udhaar` + **2** `aur` multi-instruction splits across Hinglish & Devanagari)
+- **9** safety & clarification cases (zero-qty, nameless ledger, missing amount, missing items/product/party with `missingIncludes` assertions)
+
+`scripts/eval-parser.mjs` asserts the full normalized `product` name (stripping
+only parenthetical English glosses), `ledgerAction`, IST `dueDate` (`IST+0`/`IST+1`/`IST+2`),
+`missingIncludes`, and reports `mode`, `median (p50)`, and `p95` latency,
+exiting non-zero (`process.exitCode = 1`) on any mismatch.
+
+Run against a live server:
 
 ```bash
+# Demo mode (no API key required)
 npm run eval                       # against http://localhost:3000
 node scripts/eval-parser.mjs http://localhost:3000
+
+# Live gpt-4o-mini mode (forwards OPENAI_API_KEY via x-openai-key)
+OPENAI_API_KEY=sk-... node scripts/eval-parser.mjs http://localhost:3000 --llm --delay-ms=150
 ```
 
-Measured results for this prototype run in demo mode (no API key configured):
-see the output of `npm run eval` — results below are filled only from actual
-runs, per case pass/fail plus aggregate accuracy and latency.
+Measured results (filled only from observed runs — no unmeasured LLM scores or latencies claimed):
 
-```
-$ npm run eval   (demo mode, no API key, 2026-11-27)
-
-26/26 exact-match (100%), median latency 9ms
-```
+| Mode | Pass Rate | Latency (`p50` / `p95`) | Status |
+| --- | --- | --- | --- |
+| **Demo regex parser** (no API key) | **60/60 exact-match (100%)** | Measured per run (`p50`/`p95` printed by `eval-parser.mjs`; 26-case baseline `p50 = 9ms`) | CI-verified (`typecheck-build-eval`) |
+| **`gpt-4o-mini` (`--llm`)** | Pending live `OPENAI_API_KEY` run | Pending live `OPENAI_API_KEY` run | Harness wired via `--llm` + `x-openai-key` |
 
 Demo-mode numbers measure the rule-based fallback only, not the model.
 
