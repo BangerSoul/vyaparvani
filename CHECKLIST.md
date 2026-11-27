@@ -1,7 +1,7 @@
 # VyaparVani — Resumable P0–P3 Implementation Checklist
 
-- **Last Updated**: 2026-11-27T16:28:00Z
-- **Current Milestone**: M3 Complete (`REC-06`–`REC-10` + `scripts/test-m3.mjs` CI gate) -> Ready for M4 (`REC-11`–`REC-14`)
+- **Last Updated**: 2026-11-27T16:12:00Z
+- **Current Milestone**: M3 Complete (`REC-06`–`REC-10` + `scripts/test-m3.mjs` verified green in CI) -> Ready for M4 (`REC-11`–`REC-14`)
 - **Next Resumable Step**: M4 — Implement `REC-11` (Expand `eval/golden.json` to 50–60 cases & strict `eval-parser.mjs`), `REC-12` (API/Store/Docker hardening), `REC-13` (UX polish & KPI), `REC-14` (90s finale E2E & final PDF sync)
 - **Repository Branch**: `feat/round2-submission` (branched from `master` @ `42448d4`)
 
@@ -91,7 +91,7 @@
 ### REC-10: True Hands-Free Mode (Auto-Submit + `hi-IN` TTS Readback)
 - [x] Add `"Hands-free mode"` toggle in `src/app/page.tsx` / `MicControl.tsx`
 - [x] Auto-submit transcript on speech end and speak 1-second Hinglish summary via `window.speechSynthesis` (`lang="hi-IN"`)
-- [ ] Verify M3 via GitHub Actions CI (`typecheck`, `build`, `eval`, `docker-build`)
+- [x] Verify M3 via GitHub Actions CI (`typecheck`, `build`, `eval`, `docker-build`) (Run ID `46031238306` on `af585e0`: `typecheck-build-eval` incl. `26/26 exact-match`, `test-p0.mjs`, `test-m3.mjs`, `capture-ui.mjs`, `build-deck.py` = `success`; `docker-build` = `success`)
 
 ---
 
