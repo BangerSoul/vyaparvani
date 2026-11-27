@@ -42,8 +42,12 @@ try {
   await draftCard.waitFor({ timeout: 15000 });
   await draftCard.getByRole("button", { name: "Clarify kijiye" }).waitFor({ timeout: 10000 });
 
-  // Clean up input, focus, and scroll before capturing
+  // Clean up input, dismiss toast, focus, and scroll before capturing
   await input.fill("");
+  const dismissToast = page.getByRole("button", { name: "Dismiss notification" });
+  if (await dismissToast.isVisible().catch(() => false)) {
+    await dismissToast.click();
+  }
   await page.evaluate(() => {
     if (document.activeElement instanceof HTMLElement) {
       document.activeElement.blur();

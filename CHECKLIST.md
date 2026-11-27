@@ -1,8 +1,8 @@
 # VyaparVani — Resumable P0–P3 Implementation Checklist
 
-- **Last Updated**: 2026-11-27T17:19:00Z
-- **Current Milestone**: M4 (`REC-12` Complete -> Next: `REC-13` Judge-Friendly Sandbox UX, TS Cleanup & Telemetry)
-- **Next Resumable Step**: M4 — Implement `REC-13` (`saveKey` form/TS fix + `sk-` validation, 4 clickable Hinglish chips, fixed toast, `lang="hi-Latn"`, `Aaj` vs `Pichhle din`, `edited?: boolean` + `No-edit accuracy` KPI pill) and `REC-14`
+- **Last Updated**: 2026-11-27T17:30:00Z
+- **Current Milestone**: M4 (`REC-13` Complete -> Next: `REC-14` 90-Second Finale Loop Verification & Final Sync)
+- **Next Resumable Step**: M4 — Implement `REC-14` (automated Playwright E2E test for 4-beat 90s finale flow, refresh `decks/assets/ui-screenshot.png`, rebuild `/home/bangersoul/Projects/vyaparvani/vyaparvani-idea.pdf` with final shipped UI and verified 60-case eval metrics, and confirm all CI checks green)
 - **Repository Branch**: `feat/round2-submission` (branched from `master` @ `42448d4`)
 
 ---
@@ -110,11 +110,11 @@
 - [x] Enable `output: "standalone"` in `next.config.mjs`, slim `Dockerfile` runtime stage (copying `.next/standalone` + `.next/static` + `mkdir -p /app/public`), exclude `decks` & `*.pdf` in `.dockerignore`, and update CI standalone run & `README.md`
 
 ### REC-13: Judge-Friendly Sandbox UX, TS Cleanup & Telemetry
-- [ ] Fix `saveKey` TS/form handler (`<button type="submit">` + `sk-` prefix validation) in `src/app/page.tsx`
-- [ ] Add 4 clickable Hinglish sample chips below `#typed`
-- [ ] Make toast `fixed bottom-4 left-1/2 -translate-x-1/2 z-50` and set `<html lang="hi-Latn">` in `src/app/layout.tsx`
-- [ ] Group entries into `Aaj` vs `Pichhle din`
-- [ ] Track `edited?: boolean` on `Entry` and render live `No-edit accuracy` KPI pill
+- [x] Fix `saveKey` TS/form handler (`<button type="submit">` + `sk-` prefix validation) in `src/app/page.tsx`
+- [x] Add 4 clickable Hinglish sample chips below `#typed`
+- [x] Make toast `fixed bottom-4 left-1/2 -translate-x-1/2 z-50` and set `<html lang="hi-Latn">` in `src/app/layout.tsx`
+- [x] Group entries into `Aaj` vs `Pichhle din`
+- [x] Track `edited?: boolean` on `Entry` and render live `No-edit accuracy` KPI pill
 
 ### REC-14: 90-Second Finale Loop Verification & Final Sync
 - [ ] Add automated Playwright E2E test (run in CI in no-key Demo mode) verifying the 4-beat 90-second finale flow: mixed entry -> inline clarification patch -> `Khata (Parties)` net balance + low-stock alert -> 1-tap WhatsApp slip

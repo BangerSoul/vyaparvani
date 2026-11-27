@@ -124,6 +124,7 @@ export default function EntryCard({
       missing,
       confidence,
       clarification,
+      edited: true,
       status: isInvalid ? "draft" : entry.status,
     });
     setEditing(false);

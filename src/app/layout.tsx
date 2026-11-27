@@ -16,7 +16,7 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
+    <html lang="hi-Latn">
       <body className="min-h-screen">{children}</body>
     </html>
   );

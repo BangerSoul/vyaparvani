@@ -16,6 +16,7 @@ export type Entry = {
   source: string; // original utterance
   mode: "demo" | "model";
   stockDeducted?: boolean;
+  edited?: boolean;
 };
 
 export function toDraft(parsed: ParsedEntry, source: string, mode: "demo" | "model"): Entry {
@@ -125,7 +126,7 @@ export interface StorageAdapter {
 }
 
 function normalizeEntry(raw: unknown): Entry | null {
-  if (!raw || typeof raw !== "object") return null;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   const e = raw as Record<string, unknown>;
   const type: "order" | "ledger" = e.type === "ledger" ? "ledger" : "order";
   const status: "draft" | "confirmed" = e.status === "confirmed" ? "confirmed" : "draft";
@@ -174,6 +175,7 @@ function normalizeEntry(raw: unknown): Entry | null {
     source: typeof e.source === "string" ? e.source : "",
     mode: e.mode === "model" ? "model" : "demo",
     ...(typeof e.stockDeducted === "boolean" ? { stockDeducted: e.stockDeducted } : {}),
+    ...(typeof e.edited === "boolean" ? { edited: e.edited } : {}),
   };
 }
 

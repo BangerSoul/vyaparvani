@@ -27,7 +27,7 @@ import {
   stripRestockBoilerplate,
   type StockItem,
 } from "@/lib/inventory";
-import type { ParsedEntry } from "@/lib/schema";
+import { getIstDate, type ParsedEntry } from "@/lib/schema";
 import {
   WebSpeechAdapter,
   WhisperApiAdapter,
@@ -56,6 +56,19 @@ const WISPR_SNIPPETS = [
   "Sharma kirana se 300 wasooli",
 ];
 
+const SAMPLE_CHIPS = [
+  "5 kg chawal Gupta store ko bhej do",
+  "Sharma kirana se 300 wasooli",
+  "chawal bhej do",
+  "Shyam Trader ko 5 peti tel aur Suresh ka 500 udhaar",
+] as const;
+
+function getEntryIstDate(createdAt: string): string {
+  const d = new Date(createdAt);
+  if (Number.isNaN(d.getTime())) return "";
+  return getIstDate(0, d);
+}
+
 export default function Home() {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [hydrated, setHydrated] = useState(false);
@@ -72,6 +85,7 @@ export default function Home() {
   const [hasServerKey, setHasServerKey] = useState(false);
   const [apiKey, setApiKey] = useState("");
   const [keyInput, setKeyInput] = useState("");
+  const [keyError, setKeyError] = useState("");
   const [clarifyingEntryId, setClarifyingEntryId] = useState<string | null>(null);
   const [wisprMode, setWisprMode] = useState(false);
   const [handsFree, setHandsFree] = useState(false);
@@ -136,10 +150,22 @@ export default function Home() {
 
   useEffect(() => () => clearWisprTimer(), [clearWisprTimer]);
 
-  function saveKey(e: React.FormEvent) {
+  function saveKey(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const key = keyInput.trim();
-    if (!key) return;
+    if (!key) {
+      const msg = "OpenAI API key daaliye (sk-...).";
+      setKeyError(msg);
+      setToast(msg);
+      return;
+    }
+    if (!/^sk-\S{3,}$/.test(key)) {
+      const msg = "Galat API key — OpenAI key 'sk-' se shuru honi chahiye.";
+      setKeyError(msg);
+      setToast(msg);
+      return;
+    }
+    setKeyError("");
     try {
       sessionStorage.setItem("vyaparvani.key", key);
     } catch {
@@ -157,6 +183,7 @@ export default function Home() {
       // ignore
     }
     setApiKey("");
+    setKeyError("");
     setToast("API key hatadi — demo parser wapas chal raha hai.");
   }
 
@@ -183,6 +210,14 @@ export default function Home() {
 
   const partyBalances = useMemo(() => computePartyBalances(entries), [entries]);
   const lowStockItems = useMemo(() => getLowStockItems(stock), [stock]);
+
+  const noEditMetrics = useMemo(() => {
+    const confirmed = entries.filter((e) => e.status === "confirmed");
+    const total = confirmed.length;
+    const unedited = confirmed.filter((e) => !e.edited).length;
+    const pct = total > 0 ? Math.round((unedited / total) * 100) : null;
+    return { total, unedited, pct };
+  }, [entries]);
 
   const confirmedOrderItemsCount = useMemo(
     () =>
@@ -226,6 +261,21 @@ export default function Home() {
     [entries, filter, selectedPartyKey],
   );
 
+  const { todayEntries, earlierEntries } = useMemo(() => {
+    if (!hydrated) return { todayEntries: [] as Entry[], earlierEntries: [] as Entry[] };
+    const todayIst = getIstDate(0);
+    const today: Entry[] = [];
+    const earlier: Entry[] = [];
+    for (const entry of filtered) {
+      if (getEntryIstDate(entry.createdAt) === todayIst) {
+        today.push(entry);
+      } else {
+        earlier.push(entry);
+      }
+    }
+    return { todayEntries: today, earlierEntries: earlier };
+  }, [filtered, hydrated]);
+
   const readTyped = () => (textRef.current?.value || "").trim();
 
   function speakHinglishSummary(text: string) {
@@ -264,14 +314,17 @@ export default function Home() {
     return `${party}, ${parts.join(" aur ") || "entry"}. Confirm karein?`;
   }
 
-  async function parseAndAdd(text: string) {
+  async function parseAndAdd(text: string, options?: { resetClarify?: boolean }) {
     clearWisprTimer();
     const utterance = text.trim();
     if (!utterance || parsingLockRef.current) return;
     parsingLockRef.current = true;
     setStatus("parsing");
     setErrorMsg("");
-    const activeClarify = clarifyingEntry;
+    const activeClarify = options?.resetClarify ? null : clarifyingEntry;
+    if (options?.resetClarify) {
+      setClarifyingEntryId(null);
+    }
     const isRestock = !activeClarify && parseRestockIntent(utterance);
     const parseInput = isRestock ? stripRestockBoilerplate(utterance) || utterance : utterance;
     try {
@@ -471,7 +524,7 @@ export default function Home() {
   const listening = status === "listening";
 
   return (
-    <main className="mx-auto max-w-3xl px-4 pb-16 pt-8 sm:px-6">
+    <main className="mx-auto max-w-3xl px-4 pb-24 pt-8 sm:px-6">
       <header>
         <p className="text-xs font-bold uppercase tracking-[0.18em] text-inkSoft">VyaparVani</p>
         <h1 className="mt-2 text-3xl font-bold leading-tight text-ink sm:text-4xl">
@@ -502,18 +555,27 @@ export default function Home() {
               type="password"
               autoComplete="off"
               value={keyInput}
-              onChange={(e) => setKeyInput(e.target.value)}
+              aria-invalid={Boolean(keyError)}
+              aria-describedby={keyError ? "api-key-error" : undefined}
+              onChange={(e) => {
+                setKeyInput(e.target.value);
+                if (keyError) setKeyError("");
+              }}
               placeholder="sk-..."
               className="w-full rounded-card border border-[#E4C88A] bg-white px-3 py-2 text-base text-ink"
             />
             <button
-              type="button"
-              onClick={saveKey}
+              type="submit"
               className="shrink-0 rounded-card bg-ink px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
             >
               Key save kijiye
             </button>
           </form>
+          {keyError && (
+            <p id="api-key-error" role="alert" className="mt-2 text-xs font-semibold text-[#A03325]">
+              {keyError}
+            </p>
+          )}
         </section>
       )}
       {mounted && apiKey && !hasServerKey && (
@@ -739,6 +801,26 @@ export default function Home() {
               Bhejiye
             </button>
           </div>
+          <div className="mt-3 flex flex-wrap items-center gap-1.5" aria-label="Sample Hinglish commands">
+            <span className="text-xs font-medium text-inkSoft">Try sample:</span>
+            {SAMPLE_CHIPS.map((sample) => (
+              <button
+                key={sample}
+                type="button"
+                disabled={!mounted || status === "parsing"}
+                onClick={() => {
+                  clearWisprTimer();
+                  if (textRef.current) {
+                    textRef.current.value = sample;
+                  }
+                  void parseAndAdd(sample, { resetClarify: true });
+                }}
+                className="rounded-full border border-line bg-surface px-2.5 py-1 text-xs font-medium text-ink hover:border-saffron hover:bg-[#FBF1E3] disabled:opacity-40"
+              >
+                {sample}
+              </button>
+            ))}
+          </div>
         </form>
 
         {status === "error" && (
@@ -861,7 +943,22 @@ export default function Home() {
       {/* Entries */}
       <section className="mt-10" aria-label="Entries">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-xl font-bold text-ink">Aaj ki entries</h2>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <h2 className="text-xl font-bold text-ink">
+              {filter === "khata" ? "Khata (Parties)" : "Entries"}
+            </h2>
+            {hydrated && (
+              <span
+                aria-label="No-edit accuracy"
+                className="rounded-full border border-line bg-card px-3 py-1 text-xs font-semibold text-inkSoft"
+              >
+                No-edit accuracy:{" "}
+                {noEditMetrics.pct !== null
+                  ? `${noEditMetrics.pct}% (${noEditMetrics.unedited}/${noEditMetrics.total})`
+                  : "—"}
+              </span>
+            )}
+          </div>
           <div role="tablist" aria-label="Filter entries" className="flex flex-wrap gap-1 rounded-card border border-line bg-card p-1">
             {(["all", "order", "ledger", "khata"] as const).map((f) => (
               <button
@@ -1024,18 +1121,51 @@ export default function Home() {
             </p>
           </div>
         ) : (
-          <div className="mt-4 space-y-4">
-            {filtered.map((entry) => (
-              <EntryCard
-                key={entry.id}
-                entry={entry}
-                isClarifying={entry.id === clarifyingEntryId}
-                onUpdate={updateEntry}
-                onDelete={deleteEntry}
-                onConfirm={confirmEntry}
-                onClarify={clarify}
-              />
-            ))}
+          <div className="mt-4 space-y-6">
+            {todayEntries.length > 0 && (
+              <section aria-label="Aaj ki entries" className="space-y-3">
+                <div className="flex items-center justify-between border-b border-line pb-1.5">
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-inkSoft">Aaj</h3>
+                  <span className="text-xs text-inkSoft">{todayEntries.length}</span>
+                </div>
+                <div className="space-y-4">
+                  {todayEntries.map((entry) => (
+                    <EntryCard
+                      key={entry.id}
+                      entry={entry}
+                      isClarifying={entry.id === clarifyingEntryId}
+                      onUpdate={updateEntry}
+                      onDelete={deleteEntry}
+                      onConfirm={confirmEntry}
+                      onClarify={clarify}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
+            {earlierEntries.length > 0 && (
+              <section aria-label="Pichhle din ki entries" className="space-y-3">
+                <div className="flex items-center justify-between border-b border-line pb-1.5">
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-inkSoft">
+                    Pichhle din
+                  </h3>
+                  <span className="text-xs text-inkSoft">{earlierEntries.length}</span>
+                </div>
+                <div className="space-y-4">
+                  {earlierEntries.map((entry) => (
+                    <EntryCard
+                      key={entry.id}
+                      entry={entry}
+                      isClarifying={entry.id === clarifyingEntryId}
+                      onUpdate={updateEntry}
+                      onDelete={deleteEntry}
+                      onConfirm={confirmEntry}
+                      onClarify={clarify}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
           </div>
         )}
       </section>
@@ -1044,9 +1174,18 @@ export default function Home() {
         <div
           role="status"
           aria-live="polite"
-          className="mt-6 rounded-card bg-ink px-4 py-3 text-center text-sm font-semibold text-white shadow-lg"
+          aria-atomic="true"
+          className="fixed bottom-4 left-1/2 z-50 flex w-[calc(100%-2rem)] max-w-md -translate-x-1/2 items-center justify-between gap-3 rounded-card bg-ink px-4 py-3 text-sm font-semibold text-white shadow-lg"
         >
-          {toast}
+          <span className="flex-1 text-center">{toast}</span>
+          <button
+            type="button"
+            aria-label="Dismiss notification"
+            onClick={() => setToast("")}
+            className="shrink-0 rounded px-1.5 py-0.5 text-xs font-bold text-white/80 hover:bg-white/10 hover:text-white"
+          >
+            ×
+          </button>
         </div>
       )}
     </main>
