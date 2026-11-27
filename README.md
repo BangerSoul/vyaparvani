@@ -54,8 +54,10 @@ The mic needs permission on first use; nothing is uploaded by the capture step
 - **With `OPENAI_API_KEY` set** (server env; store the value in your secret
   manager, never in the repo): `/api/parse` calls the model with a zod
   structured-output schema and a glossary of local trade terms and units
-  (`drib`, `kalawa`, `peti`, `darjan`, Hinglish numerals…). One retry on rate
-  limit, 15 s timeout, per-request log with model/tokens/latency.
+  (`drib`, `kalawa`, `peti`, `darjan`, Hinglish numerals…). Per-attempt
+  `AbortController` (15 s timeout within a 25 s budget), bounded `429`
+  exponential backoff (up to 2 retries; immediate `429` on `insufficient_quota`),
+  `401` invalid-key detection, and per-request logs with model/tokens/latency.
 - **Without a key** the app runs in **demo mode**: a local rule-based parser
   (keyword + number extraction). The home screen shows an "API key set nahi
   hai" banner with a key box — paste a key there (kept in the browser session
@@ -130,6 +132,8 @@ Demo-mode numbers measure the rule-based fallback only, not the model.
 docker compose up --build
 ```
 
-Multi-stage build, non-root user, no secrets baked into the image. Pass the
-API key at runtime: `OPENAI_API_KEY=sk-... docker compose up` (compose reads
-it from the environment).
+Multi-stage Next.js `output: "standalone"` build (`node server.js`), non-root
+`app` user, no secrets baked into the image, and a `HEALTHCHECK` probing
+`GET /api/health` (`{ ok: true, status: "healthy", mode: "demo" | "model", timestamp }`).
+Pass the API key at runtime: `OPENAI_API_KEY=sk-... docker compose up` (compose
+reads it from the environment).

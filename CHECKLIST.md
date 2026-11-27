@@ -1,8 +1,8 @@
 # VyaparVani — Resumable P0–P3 Implementation Checklist
 
-- **Last Updated**: 2026-11-27T17:03:00Z
-- **Current Milestone**: M4 (`REC-11` Complete -> Next: `REC-12` API/Storage/Standalone Docker Hardening)
-- **Next Resumable Step**: M4 — Implement `REC-12` (`route.ts` cleanup/AbortController/429 backoff/401, `/api/health`, `store.ts` `StorageAdapter` + backup/import, `output: "standalone"` + slim `Dockerfile`), `REC-13`, `REC-14`
+- **Last Updated**: 2026-11-27T17:19:00Z
+- **Current Milestone**: M4 (`REC-12` Complete -> Next: `REC-13` Judge-Friendly Sandbox UX, TS Cleanup & Telemetry)
+- **Next Resumable Step**: M4 — Implement `REC-13` (`saveKey` form/TS fix + `sk-` validation, 4 clickable Hinglish chips, fixed toast, `lang="hi-Latn"`, `Aaj` vs `Pichhle din`, `edited?: boolean` + `No-edit accuracy` KPI pill) and `REC-14`
 - **Repository Branch**: `feat/round2-submission` (branched from `master` @ `42448d4`)
 
 ---
@@ -103,11 +103,11 @@
 - [x] Document both Demo mode (`60/60 exact-match (100%)`) and wired `gpt-4o-mini` `--llm` mode in `README.md` and `decks/vyaparvani-idea.deck.json`
 
 ### REC-12: API, Storage & Standalone Docker Hardening
-- [ ] Clean unused imports (`z`, `parsedEntrySchema`) in `src/app/api/parse/route.ts`
-- [ ] Wire `AbortController` + `clearTimeout` into `generateObject({ abortSignal })`, add exponential backoff on `429`, and map `401` invalid key errors to HTTP `401`
-- [ ] Add `GET /api/health` (`src/app/api/health/route.ts`) and update `Dockerfile` `HEALTHCHECK`
-- [ ] Wrap `saveEntries` in `try/catch` and export `StorageAdapter` + JSON backup/import in `src/lib/store.ts`
-- [ ] Enable `output: "standalone"` in `next.config.mjs` and slim `Dockerfile` runtime stage (copying `.next/standalone` + `.next/static`)
+- [x] Audit `src/app/api/parse/route.ts` imports (`z`, `parsedEntrySchema` actively used by `existingEntrySchema`) and remove obsolete `withTimeout`
+- [x] Wire per-attempt `AbortController` + `clearTimeout` + `maxRetries: 0` into `generateObject({ abortSignal })`, add bounded exponential backoff on `429` (`600ms * 2 ** attempt`, immediate `429` on `insufficient_quota`), and map `AbortError` -> `504` & `401` invalid key errors -> HTTP `401`
+- [x] Add `GET /api/health` (`src/app/api/health/route.ts`, `force-dynamic`), update `Dockerfile` `HEALTHCHECK`, and add CI container smoke test
+- [x] Wrap `saveEntries` in SSR + `try/catch` (returning `boolean`) and export `StorageAdapter`, `LocalStorageAdapter`, `defaultStorageAdapter`, `exportEntriesJson`, and `importEntriesJson` in `src/lib/store.ts`
+- [x] Enable `output: "standalone"` in `next.config.mjs`, slim `Dockerfile` runtime stage (copying `.next/standalone` + `.next/static` + `mkdir -p /app/public`), exclude `decks` & `*.pdf` in `.dockerignore`, and update CI standalone run & `README.md`
 
 ### REC-13: Judge-Friendly Sandbox UX, TS Cleanup & Telemetry
 - [ ] Fix `saveKey` TS/form handler (`<button type="submit">` + `sk-` prefix validation) in `src/app/page.tsx`

@@ -1,5 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  allowedDevOrigins: ["*.vercel.run"],};
+  output: "standalone",
+  allowedDevOrigins: ["*.vercel.run"],
+};
 
 export default nextConfig;

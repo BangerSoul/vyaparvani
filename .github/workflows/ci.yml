@@ -32,13 +32,15 @@ jobs:
       - name: Start server in Demo mode and run eval + P0 tests
         run: |
           set -euo pipefail
-          npm run start -- -H 127.0.0.1 -p 3000 > server.log 2>&1 &
+          cp -r .next/static .next/standalone/.next/static
+          if [ -d public ]; then cp -r public .next/standalone/public; fi
+          HOSTNAME=127.0.0.1 PORT=3000 node .next/standalone/server.js > server.log 2>&1 &
           SERVER_PID=$!
           trap 'kill "$SERVER_PID" 2>/dev/null || true; wait "$SERVER_PID" 2>/dev/null || true' EXIT
 
           ready=0
           for i in $(seq 1 30); do
-            if curl -fsS http://127.0.0.1:3000/ > /dev/null 2>&1; then
+            if curl -fsS http://127.0.0.1:3000/api/health | grep -q '"healthy"'; then
               ready=1
               break
             fi
@@ -118,3 +120,25 @@ jobs:
 
       - name: Build Docker image
         run: docker build -t vyaparvani:ci .
+
+      - name: Smoke-test Docker standalone container & /api/health
+        run: |
+          set -euo pipefail
+          docker run -d --name vv-ci -p 127.0.0.1:3000:3000 vyaparvani:ci
+          trap 'docker logs vv-ci || true; docker rm -f vv-ci >/dev/null 2>&1 || true' EXIT
+
+          ready=0
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3000/api/health | grep -q '"healthy"'; then
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+          [ "$ready" -eq 1 ] || { echo "Container healthcheck endpoint did not become ready"; exit 1; }
+
+          curl -fsS http://127.0.0.1:3000/api/health | grep -q '"mode":"demo"'
+          curl -fsS http://127.0.0.1:3000/ >/dev/null
+          curl -fsS -X POST http://127.0.0.1:3000/api/parse \
+            -H 'Content-Type: application/json' \
+            -d '{"utterance":"5 kg chawal Gupta store ko bhej do"}' | grep -q '"Gupta Store"'

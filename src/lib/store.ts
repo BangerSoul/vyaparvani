@@ -117,28 +117,149 @@ function newId() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-export function loadEntries(): Entry[] {
-  if (typeof window === "undefined") return [];
+export interface StorageAdapter {
+  load(): Entry[];
+  save(entries: Entry[]): boolean | void;
+  exportJson?(entries?: Entry[]): string;
+  importJson?(raw: string): Entry[];
+}
+
+function normalizeEntry(raw: unknown): Entry | null {
+  if (!raw || typeof raw !== "object") return null;
+  const e = raw as Record<string, unknown>;
+  const type: "order" | "ledger" = e.type === "ledger" ? "ledger" : "order";
+  const status: "draft" | "confirmed" = e.status === "confirmed" ? "confirmed" : "draft";
+  const ledgerAction: LedgerAction =
+    e.ledgerAction === "credit_given" || e.ledgerAction === "payment_received"
+      ? e.ledgerAction
+      : type === "ledger"
+        ? "credit_given"
+        : null;
+
+  const items: EntryItem[] = Array.isArray(e.items)
+    ? e.items
+        .filter((it): it is Record<string, unknown> => Boolean(it && typeof it === "object"))
+        .map((it) => ({
+          product: typeof it.product === "string" ? it.product : "",
+          quantity:
+            typeof it.quantity === "number" && Number.isFinite(it.quantity) && it.quantity >= 0
+              ? it.quantity
+              : 0,
+          unit: typeof it.unit === "string" ? it.unit : "",
+        }))
+        .filter((it) => it.product.trim().length > 0)
+    : [];
+
+  return {
+    id: typeof e.id === "string" && e.id.trim() ? e.id : newId(),
+    createdAt:
+      typeof e.createdAt === "string" && e.createdAt.trim()
+        ? e.createdAt
+        : new Date().toISOString(),
+    status,
+    type,
+    ledgerAction,
+    items,
+    party: typeof e.party === "string" ? e.party : "",
+    dueDate: typeof e.dueDate === "string" ? e.dueDate : "",
+    amount: typeof e.amount === "number" && Number.isFinite(e.amount) ? e.amount : null,
+    confidence:
+      typeof e.confidence === "number" && Number.isFinite(e.confidence)
+        ? Math.min(1, Math.max(0, e.confidence))
+        : 0.5,
+    missing: Array.isArray(e.missing)
+      ? e.missing.filter((m): m is string => typeof m === "string")
+      : [],
+    clarification: typeof e.clarification === "string" ? e.clarification : "",
+    source: typeof e.source === "string" ? e.source : "",
+    mode: e.mode === "model" ? "model" : "demo",
+    ...(typeof e.stockDeducted === "boolean" ? { stockDeducted: e.stockDeducted } : {}),
+  };
+}
+
+function normalizeEntries(list: unknown[]): Entry[] {
+  const out: Entry[] = [];
+  for (const item of list) {
+    const normalized = normalizeEntry(item);
+    if (normalized) out.push(normalized);
+  }
+  return out;
+}
+
+export function exportEntriesJson(entries: Entry[]): string {
+  return JSON.stringify(
+    {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      entries,
+    },
+    null,
+    2,
+  );
+}
+
+export function importEntriesJson(raw: string): Entry[] {
+  let parsed: unknown;
   try {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return [];
-    const list = JSON.parse(raw);
-    if (!Array.isArray(list)) return [];
-    return list.map((e) => ({
-      ...e,
-      ledgerAction:
-        e?.ledgerAction === "credit_given" || e?.ledgerAction === "payment_received"
-          ? e.ledgerAction
-          : e?.type === "ledger"
-            ? "credit_given"
-            : null,
-      missing: Array.isArray(e?.missing) ? e.missing : [],
-    }));
+    parsed = JSON.parse(raw);
   } catch {
-    return [];
+    throw new Error("Invalid JSON backup");
+  }
+  const list = Array.isArray(parsed)
+    ? parsed
+    : parsed &&
+        typeof parsed === "object" &&
+        Array.isArray((parsed as { entries?: unknown }).entries)
+      ? (parsed as { entries: unknown[] }).entries
+      : null;
+  if (!list) {
+    throw new Error("Backup JSON must be an Entry[] or { version: 1, entries: Entry[] }");
+  }
+  return normalizeEntries(list);
+}
+
+export class LocalStorageAdapter implements StorageAdapter {
+  constructor(private readonly storageKey = KEY) {}
+
+  load(): Entry[] {
+    if (typeof window === "undefined") return [];
+    try {
+      const raw = localStorage.getItem(this.storageKey);
+      if (!raw) return [];
+      const list: unknown = JSON.parse(raw);
+      if (!Array.isArray(list)) return [];
+      return normalizeEntries(list);
+    } catch {
+      return [];
+    }
+  }
+
+  save(entries: Entry[]): boolean {
+    if (typeof window === "undefined") return false;
+    try {
+      localStorage.setItem(this.storageKey, JSON.stringify(entries));
+      return true;
+    } catch (err: unknown) {
+      console.warn("Failed to save entries to localStorage:", err);
+      return false;
+    }
+  }
+
+  exportJson(entries?: Entry[]): string {
+    return exportEntriesJson(entries ?? this.load());
+  }
+
+  importJson(raw: string): Entry[] {
+    return importEntriesJson(raw);
   }
 }
 
-export function saveEntries(entries: Entry[]) {
-  localStorage.setItem(KEY, JSON.stringify(entries));
+export const defaultStorageAdapter = new LocalStorageAdapter();
+
+export function loadEntries(): Entry[] {
+  return defaultStorageAdapter.load();
+}
+
+export function saveEntries(entries: Entry[]): boolean {
+  return defaultStorageAdapter.save(entries);
 }
