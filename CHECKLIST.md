@@ -1,8 +1,8 @@
 # VyaparVani — Resumable P0–P3 Implementation Checklist
 
-- **Last Updated**: 2026-11-27T17:30:00Z
-- **Current Milestone**: M4 (`REC-13` Complete -> Next: `REC-14` 90-Second Finale Loop Verification & Final Sync)
-- **Next Resumable Step**: M4 — Implement `REC-14` (automated Playwright E2E test for 4-beat 90s finale flow, refresh `decks/assets/ui-screenshot.png`, rebuild `/home/bangersoul/Projects/vyaparvani/vyaparvani-idea.pdf` with final shipped UI and verified 60-case eval metrics, and confirm all CI checks green)
+- **Last Updated**: 2026-11-27T17:57:00Z
+- **Current Milestone**: M4 (`REC-14` Complete — All M0–M4 Milestones Verified)
+- **Next Resumable Step**: None — ready for final Round 2 submission (`feat/round2-submission` green in CI)
 - **Repository Branch**: `feat/round2-submission` (branched from `master` @ `42448d4`)
 
 ---
@@ -117,6 +117,6 @@
 - [x] Track `edited?: boolean` on `Entry` and render live `No-edit accuracy` KPI pill
 
 ### REC-14: 90-Second Finale Loop Verification & Final Sync
-- [ ] Add automated Playwright E2E test (run in CI in no-key Demo mode) verifying the 4-beat 90-second finale flow: mixed entry -> inline clarification patch -> `Khata (Parties)` net balance + low-stock alert -> 1-tap WhatsApp slip
-- [ ] Refresh `decks/assets/ui-screenshot.png` and rebuild `/home/bangersoul/Projects/vyaparvani/vyaparvani-idea.pdf` with final shipped UI and verified 50–60 eval metrics
-- [ ] Final push to `origin feat/round2-submission` and confirm all GitHub Actions CI checks pass green
+- [x] Add automated Playwright E2E test (run in CI in no-key Demo mode) verifying the 4-beat 90-second finale flow: mixed entry -> inline clarification patch -> `Khata (Parties)` net balance + low-stock alert -> 1-tap WhatsApp slip
+- [x] Refresh `decks/assets/ui-screenshot.png` and rebuild `/home/bangersoul/Projects/vyaparvani/vyaparvani-idea.pdf` with final shipped UI and verified 50–60 eval metrics
+- [x] Final push to `origin feat/round2-submission` and confirm all GitHub Actions CI checks pass green
