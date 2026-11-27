@@ -1,8 +1,8 @@
 # VyaparVani — Resumable P0–P3 Implementation Checklist
 
-- **Last Updated**: 2026-11-27T11:00:00Z
-- **Current Milestone**: M0 — Bootstrap, Resumable Checklist & GitHub CI Foundation
-- **Next Resumable Step**: Push M0 commit on `feat/round2-submission` and verify baseline GitHub Actions CI passes before starting M1 (`REC-01`).
+- **Last Updated**: 2026-11-27T11:00:30Z
+- **Current Milestone**: M0 Complete -> Ready for M1 (P0 Critical Demo-Savers)
+- **Next Resumable Step**: M1 — `REC-01` (`MicControl` stop lifecycle, `finalTextRef` accumulation, and `SpeechInputAdapter`)
 - **Repository Branch**: `feat/round2-submission` (branched from `master` @ `42448d4`)
 
 ---
@@ -14,8 +14,8 @@
 - [x] Create resumable P0–P3 `CHECKLIST.md` covering `REC-01`–`REC-14`, `REC-05` + Round 2 Req 3.3, and CI verification
 - [x] Add `"typecheck": "tsc --noEmit"` to `package.json` scripts
 - [x] Create `.github/workflows/ci.yml` (`typecheck-build-eval` in no-key Demo mode + `docker-build`)
-- [ ] Commit M0 files and push to `origin feat/round2-submission`
-- [ ] Verify baseline GitHub Actions CI run passes on `feat/round2-submission`
+- [x] Commit M0 files and push to `origin feat/round2-submission`
+- [x] Verify baseline GitHub Actions CI run passes on `feat/round2-submission` (Run ID `45986618520`: `typecheck-build-eval` = `success`, `docker-build` = `success`)
 
 ---
 
