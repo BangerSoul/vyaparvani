@@ -23,5 +23,6 @@
   { "n": 22, "utterance": "bees kg chini Reddy store ko bhej do", "expect": { "type": "order", "items": [["chini", 20, "kg"]], "party": "Reddy Store", "needsClarification": false } },
   { "n": 23, "utterance": "char dibbi ghee Nair traders ko bhej do", "expect": { "type": "order", "items": [["ghee", 4, "dibbi"]], "party": "Nair Traders", "needsClarification": false } },
   { "n": 24, "utterance": "nau kg dal daas packet sabun Gupta store ko", "expect": { "type": "order", "items": [["dal", 9, "kg"], ["sabun", 10, "packet"]], "party": "Gupta Store", "needsClarification": false } },
-  { "n": 25, "utterance": "Gupta store ko 5 kg chawal bhej do aur unka 200 udhaar tha", "expect": { "type": "order", "items": [["chawal", 5, "kg"]], "party": "Gupta Store", "amount": 200, "needsClarification": false } }
+  { "n": 25, "utterance": "Gupta store ko 5 kg chawal bhej do aur unka 200 udhaar tha", "expect": { "type": "order", "items": [["chawal", 5, "kg"]], "party": "Gupta Store", "amount": 200, "needsClarification": false } },
+  { "n": 26, "utterance": "Shyam Trader ke liye 5 peti oil add karo aur Suresh ka 500 udhaar likho", "expect": { "multi": [ { "type": "order", "items": [["tel", 5, "peti"]], "party": "Shyam Trader", "amount": null, "needsClarification": false }, { "type": "ledger", "items": [], "amount": 500, "party": "Suresh", "needsClarification": false } ] } }
 ]

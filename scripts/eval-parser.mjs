@@ -27,6 +27,16 @@ for (const c of CASES) {
 }
 
 function check(got, exp) {
+  const entries = Array.isArray(got?.entries) ? got.entries : [got];
+  if (exp.multi) {
+    if (entries.length !== exp.multi.length) return false;
+    return exp.multi.every((e, i) => checkOne(entries[i], e));
+  }
+  if (entries.length !== 1) return false;
+  return checkOne(entries[0], exp);
+}
+
+function checkOne(got, exp) {
   if ((got.type ?? null) !== (exp.type ?? null)) return false;
   if (exp.party !== undefined && (got.party ?? "").toLowerCase() !== exp.party.toLowerCase()) return false;
   if (exp.amount !== undefined && (got.amount ?? null) !== exp.amount) return false;

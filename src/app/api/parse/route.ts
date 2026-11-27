@@ -2,12 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { createOpenAI } from "@ai-sdk/openai";
 import { generateObject } from "ai";
 import { z } from "zod";
-import { parsedEntrySchema, SYSTEM_PROMPT } from "@/lib/schema";
-import { parseDemo } from "@/lib/demo-parser";
+import { parsedEntrySchema, parsedResponseSchema, SYSTEM_PROMPT } from "@/lib/schema";
+import { parseDemoUtterance } from "@/lib/demo-parser";
 
 export const runtime = "nodejs";
 
 const MODEL_TIMEOUT_MS = 15000;
+const KEY_HEADER = "x-openai-key";
+
+// Lets the UI show the "API key not set" banner. Never returns the key itself.
+export async function GET() {
+  return NextResponse.json({ hasServerKey: Boolean(process.env.OPENAI_API_KEY) });
+}
 
 export async function POST(req: NextRequest) {
   let utterance = "";
@@ -21,17 +27,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "utterance is required" }, { status: 400 });
   }
 
-  const apiKey = process.env.OPENAI_API_KEY;
+  // Server env key first; otherwise a per-request key the user typed into the
+  // app (kept in their browser session, never logged or persisted here).
+  const headerKey = (req.headers.get(KEY_HEADER) || "").trim();
+  const apiKey = process.env.OPENAI_API_KEY || headerKey;
   const started = Date.now();
 
   if (!apiKey) {
     // Demo mode: local rule-based parser, clearly not the real model.
-    const parsed = parseDemo(utterance);
+    const entries = parseDemoUtterance(utterance);
     console.log(JSON.stringify({
       mode: "demo", model: "rule-based", latencyMs: Date.now() - started,
-      utteranceLength: utterance.length,
+      utteranceLength: utterance.length, entries: entries.length,
     }));
-    return NextResponse.json({ ...parsed, mode: "demo" });
+    return NextResponse.json({ entries, mode: "demo" });
   }
 
   const openai = createOpenAI({ apiKey });
@@ -41,7 +50,7 @@ export async function POST(req: NextRequest) {
     const { object, usage } = await withTimeout(
       generateObject({
         model: openai(model),
-        schema: parsedEntrySchema,
+        schema: parsedResponseSchema,
         system: SYSTEM_PROMPT,
         prompt: utterance,
       }),
@@ -50,8 +59,9 @@ export async function POST(req: NextRequest) {
     console.log(JSON.stringify({
       mode: "model", model, latencyMs: Date.now() - started,
       promptTokens: usage?.promptTokens, completionTokens: usage?.completionTokens,
+      entries: object.entries.length,
     }));
-    return NextResponse.json({ ...object, mode: "model" });
+    return NextResponse.json({ entries: object.entries, mode: "model" });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     if (/rate.?limit|429/i.test(msg)) {
@@ -60,14 +70,14 @@ export async function POST(req: NextRequest) {
         const { object, usage } = await withTimeout(
           generateObject({
             model: openai(model),
-            schema: parsedEntrySchema,
+            schema: parsedResponseSchema,
             system: SYSTEM_PROMPT,
             prompt: utterance,
           }),
           MODEL_TIMEOUT_MS,
         );
-        console.log(JSON.stringify({ mode: "model", model: model + " (retry)", latencyMs: Date.now() - started, promptTokens: usage?.promptTokens, completionTokens: usage?.completionTokens }));
-        return NextResponse.json({ ...object, mode: "model" });
+        console.log(JSON.stringify({ mode: "model", model: model + " (retry)", latencyMs: Date.now() - started, promptTokens: usage?.promptTokens, completionTokens: usage?.completionTokens, entries: object.entries.length }));
+        return NextResponse.json({ entries: object.entries, mode: "model" });
       } catch (retryErr: unknown) {
         return NextResponse.json(
           { error: "Rate limited and retry failed", detail: retryErr instanceof Error ? retryErr.message : String(retryErr) },

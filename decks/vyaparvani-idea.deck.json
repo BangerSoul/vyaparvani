@@ -1,0 +1,162 @@
+{
+  "version": 1,
+  "title": "VyaparVani — build for the way India talks",
+  "theme": {
+    "background": "#FAF6EE",
+    "surface": "#FFFFFF",
+    "text": "#1F2A24",
+    "muted": "#6B6455",
+    "accent": "#C7660A",
+    "accent2": "#2F6F5E",
+    "font": "Inter",
+    "heading": "Bricolage Grotesque",
+    "style": "grid"
+  },
+  "slides": [
+    {
+      "layout": "cover",
+      "kicker": "Wispr x Scaler Hackathon — Round 2",
+      "title": "VyaparVani",
+      "subtitle": "Bolo, samajh gaya, likh diya. A voice-first order and khata assistant for India's 13 million kirana stores — built as a working Docker Compose prototype.",
+      "notes": "Open with the one-line demo: speak '5 kg chawal Gupta store ko bhej do' and show the confirmed entry."
+    },
+    {
+      "layout": "statement",
+      "kicker": "The problem",
+      "title": "Kirana owners keep stock and udhaar in their heads",
+      "highlight": "in their heads",
+      "body": "13 million neighborhood stores run on notebooks and memory — text-heavy apps interrupt service, so they go unused. [1]",
+      "notes": "The competition isn't other apps; it's the notebook and memory. Anything that demands typing mid-transaction loses to them.",
+      "sources": [
+        { "title": "Invest India — Modernization of Kirana Stores in India (2021)", "url": "https://www.investindia.gov.in/team-india-blogs/modernization-kirana-stores-india" }
+      ]
+    },
+    {
+      "layout": "stats",
+      "title": "Informal retail is the market, not the fringe",
+      "body": "Kiranas still hold ~88% of Indian retail, and stores are closing under quick-commerce pressure — the cost of doing nothing is rising. [1][2]",
+      "stats": [
+        { "value": "13M", "label": "kirana and neighborhood stores in India" },
+        { "value": "88%", "label": "of retail is unorganized / informal" },
+        { "value": "$608B", "label": "Indian grocery retail in 2020 (Forrester)" },
+        { "value": "2 lakh", "label": "stores claimed closed in 2024 under quick-commerce pressure" }
+      ],
+      "sources": [
+        { "title": "Invest India — Modernization of Kirana Stores in India (2021)", "url": "https://www.investindia.gov.in/team-india-blogs/modernization-kirana-stores-india" },
+        { "title": "The Hindu BusinessLine — AICPDF on kirana closures (Oct 2024)", "url": "https://www.thehindubusinessline.com/companies/aicpdf-claims-rise-of-quick-commerce-economic-pressures-have-led-to-kirana-store-closures/article68805343.ece" }
+      ],
+      "notes": "The pressure point: quick commerce is eating top-up purchases. Digitized ordering is how kiranas defend share — and that is exactly what VyaparVani makes effortless."
+    },
+    {
+      "layout": "split",
+      "title": "Speak Hinglish, get a confirmed entry",
+      "body": "VyaparVani turns a spoken line — \"5 kg chawal Gupta store ko bhej do\" — into a structured, editable order or udhaar entry. The prototype already does this end to end: voice capture, model parsing with a trade glossary, editable cards, confirm-to-save, and clarifying questions when the speech is incomplete.",
+      "bullets": [
+        "One dominant mic control with live transcript",
+        "Order and udhaar cards: edit, delete, confirm",
+        "Asks back instead of guessing on low confidence",
+        "Works without any API key in demo mode"
+      ],
+      "notes": "Walk the audience through the shipped UI: large mic, transcript, card with three always-visible actions, Hinglish copy everywhere."
+    },
+    {
+      "layout": "diagram",
+      "title": "Four steps, under ten seconds at the counter",
+      "diagram": {
+        "kind": "flow",
+        "nodes": [
+          { "id": "speak", "label": "Boliye", "body": "Mic or type the line", "icon": "phone" },
+          { "id": "parse", "label": "Parse", "body": "zod schema + trade glossary", "icon": "cpu" },
+          { "id": "review", "label": "Review", "body": "Edit, or answer a clarifying question", "icon": "eye" },
+          { "id": "save", "label": "Confirm", "body": "Saved, survives reload", "icon": "check" }
+        ],
+        "edges": [
+          { "from": "speak", "to": "parse" },
+          { "from": "parse", "to": "review" },
+          { "from": "review", "to": "save" }
+        ],
+        "highlight": "parse"
+      },
+      "notes": "This diagram matches the shipped code exactly: Web Speech capture in the browser, /api/parse calling the model with a zod structured-output schema and trade glossary, cards with confirm/edit/delete, and localStorage persistence after confirm."
+    },
+    {
+      "layout": "chart",
+      "title": "The parser is measured, not promised",
+      "body": "26 golden Hinglish utterances — 21 order, 4 udhaar, 1 mixed order+udhaar — including noise cases (missing quantity, missing product). 26/26 exact match, run on every check. [1]",
+      "chart": {
+        "type": "bar",
+        "labels": ["Order utterances", "Ledger (udhaar)", "Mixed order + udhaar"],
+        "series": [{ "name": "Exact match", "values": [21, 4, 1] }],
+        "unit": "of 26 cases",
+        "highlight": 2
+      },
+      "sources": [
+        { "title": "VyaparVani eval run, demo mode, 2026-11-27 (npm run eval)", "url": "https://github.com/BangerSoul/vyaparvani" }
+      ],
+      "notes": "26/26 exact-match, median latency 9ms in demo mode (npm run eval, 2026-11-27). These numbers measure the rule-based fallback parser only; the model path is wired and needs an OPENAI_API_KEY to measure."
+    },
+    {
+      "layout": "features",
+      "title": "What the prototype already does",
+      "items": [
+        { "icon": "phone", "title": "Voice and typed capture", "body": "Web Speech API mic, typed fallback." },
+        { "icon": "cpu", "title": "Structured parsing", "body": "AI SDK + zod, trade glossary, one retry on 429." },
+        { "icon": "message", "title": "Clarification, not guessing", "body": "Low confidence gets a Hinglish question." },
+        { "icon": "shield", "title": "Runs anywhere", "body": "docker compose up; demo mode needs no key." },
+        { "icon": "gauge", "title": "Regression eval", "body": "26-utterance golden set on every run." }
+      ],
+      "notes": "Deck-code match check: every item maps to a shipped file — MicControl (Web Speech), api/parse (AI SDK, zod, glossary, timeout, retry), clarification prompts, Dockerfile + compose, eval/golden.json + scripts/eval-parser.mjs. Edit, delete and confirm sit on every entry card."
+    },
+    {
+      "layout": "table",
+      "title": "Downstream dependencies: all swappable",
+      "table": {
+        "columns": ["Layer", "Today", "Swap path"],
+        "rows": [
+          ["Capture", "Web Speech API", "Whisper / on-device ASR"],
+          ["Model", "gpt-4o-mini via AI SDK", "Any provider, same zod contract"],
+          ["No-key fallback", "Rule-based parser", "Offline mode"],
+          ["Storage", "localStorage", "Synced Postgres"]
+        ]
+      },
+      "notes": "Nothing is welded to one vendor. The zod structured-output contract means a model swap is a one-line change; capture moves to a dedicated ASR provider; regional languages reuse the glossary pattern (verified path today: Hinglish)."
+    },
+    {
+      "layout": "metric",
+      "kicker": "Why this wins",
+      "title": "Zero typing beats zero features",
+      "stats": [
+        { "value": "0", "label": "keystrokes for a confirmed order" },
+        { "value": "1", "label": "sentence per entry, in the seller's own words" },
+        { "value": "100%", "label": "of golden utterances parsed exactly (demo mode)" }
+      ],
+      "body": "Competing POS apps demand form-filling mid-transaction. VyaparVani meets the shopkeeper at the counter: speak, glance, confirm. The wedge is the entry, not the accounting suite.",
+      "sources": [
+        { "title": "VyaparVani eval run, demo mode, 2026-11-27 (npm run eval)", "url": "https://github.com/BangerSoul/vyaparvani" }
+      ],
+      "notes": "Early success measure we committed to in the README: share of entries accepted without edits. No impact numbers are claimed until measured."
+    },
+    {
+      "layout": "timeline",
+      "title": "Go-to-market: through the distributor, not the app store",
+      "items": [
+        { "tag": "Now", "title": "Prototype on Docker Compose", "body": "Public repo, eval set, demo mode — this submission." },
+        { "tag": "Phase 2", "title": "10 friendly kiranas + 1 FMCG distributor", "body": "Pilot with real stock lines; measure entries accepted without edit." },
+        { "tag": "Phase 3", "title": "Distributor-led distribution", "body": "Salesmen already visit weekly — they carry the app to the shop." },
+        { "tag": "Phase 4", "title": "Monetize the order flow", "body": "Free for entries; charge distributors for digitized orders and insights." }
+      ],
+      "notes": "GTM thesis: kiranas don't buy software, but FMCG distributors need their order lines digitized. The shopkeeper gets a free voice khata; the distributor pays for the pipeline it creates."
+    },
+    {
+      "layout": "quote",
+      "quote": "5 kg chawal Gupta store ko bhej do.",
+      "author": "One spoken sentence — one confirmed, structured order",
+      "notes": "Read it aloud the way a shopkeeper would say it, then show the saved card." },
+    {
+      "layout": "closing",
+      "title": "Bolo, samajh gaya, likh diya.",
+      "subtitle": "VyaparVani — built with Wispr Flow. docker compose up, and the counter is open.",
+      "notes": "Close on the demo: the prototype is real, running, and measured. Ask for the pass to the finale."
+    }
+  ]
+}

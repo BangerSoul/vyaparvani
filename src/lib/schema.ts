@@ -20,6 +20,12 @@ export const parsedEntrySchema = z.object({
 export type ParsedEntry = z.infer<typeof parsedEntrySchema>;
 export type EntryItem = z.infer<typeof entryItemSchema>;
 
+// One utterance usually yields one entry, but can carry two instructions
+// ("...ke liye 5 peti oil add karo, aur Suresh ka 500 udhaar likho").
+export const parsedResponseSchema = z.object({
+  entries: z.array(parsedEntrySchema).min(1).max(3),
+});
+
 // Trade glossary used in the model prompt and mirrored by the demo parser.
 export const GLOSSARY = `
 Units and trade terms (Hinglish / Hindi):
@@ -37,7 +43,8 @@ Party words: "ko bhej do", "ke liye", store names like "Gupta store", "Sharma ki
 `.trim();
 
 export const SYSTEM_PROMPT = `You extract structured retail entries from spoken-style Hinglish utterances by small-shop owners.
-Return exactly one entry: type "order" (goods to send/deliver) or "ledger" (credit/udhaar/collection).
+Each entry is type "order" (goods to send/deliver) or "ledger" (credit/udhaar/collection).
+Usually an utterance is one entry; if it clearly contains two separate instructions (for example an order for one party and udhaar for another person), return both entries in spoken order. Never split a single instruction into multiple entries.
 Rules:
 - Use the glossary of local units and terms provided.
 - Never invent a quantity, product or party that is not in the utterance. If a quantity is missing for an item, include the item with quantity 0... prefer instead to list the field name in "missing".

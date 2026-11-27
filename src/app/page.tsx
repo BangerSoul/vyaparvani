@@ -17,11 +17,49 @@ export default function Home() {
   const [toast, setToast] = useState("");
   const [filter, setFilter] = useState<"all" | "order" | "ledger">("all");
   const [mounted, setMounted] = useState(false);
+  const [hasServerKey, setHasServerKey] = useState(false);
+  const [apiKey, setApiKey] = useState("");
+  const [keyInput, setKeyInput] = useState("");
   const textRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setMounted(true);
+    try {
+      setApiKey(sessionStorage.getItem("vyaparvani.key") || "");
+    } catch {
+      setApiKey("");
+    }
+    fetch("/api/parse")
+      .then((r) => r.json())
+      .then((d) => setHasServerKey(Boolean(d.hasServerKey)))
+      .catch(() => setHasServerKey(false));
   }, []);
+
+  const keyReady = Boolean(apiKey) || hasServerKey;
+
+  function saveKey(e: React.FormEvent) {
+    e.preventDefault();
+    const key = keyInput.trim();
+    if (!key) return;
+    try {
+      sessionStorage.setItem("vyaparvani.key", key);
+    } catch {
+      // session-only key is best-effort; keep it in memory regardless
+    }
+    setApiKey(key);
+    setKeyInput("");
+    setToast("API key set — ab real model se parsing hogi.");
+  }
+
+  function removeKey() {
+    try {
+      sessionStorage.removeItem("vyaparvani.key");
+    } catch {
+      // ignore
+    }
+    setApiKey("");
+    setToast("API key hatadi — demo parser wapas chal raha hai.");
+  }
 
   useEffect(() => {
     setEntries(loadEntries());
@@ -56,20 +94,25 @@ export default function Home() {
     try {
       const res = await fetch("/api/parse", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(apiKey ? { "x-openai-key": apiKey } : {}),
+        },
         body: JSON.stringify({ utterance }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.detail || body.error || `Server ne ${res.status} bheja`);
       }
-      const parsed: ParsedEntry & { mode?: "demo" | "model" } = await res.json();
-      const draft = toDraft(parsed, utterance, parsed.mode === "model" ? "model" : "demo");
-      setEntries((prev) => [draft, ...prev]);
+      const parsed: { entries: ParsedEntry[]; mode?: "demo" | "model" } = await res.json();
+      const mode = parsed.mode === "model" ? "model" : "demo";
+      const drafts = parsed.entries.map((e) => toDraft(e, utterance, mode));
+      setEntries((prev) => [...drafts, ...prev]);
       setTranscript("");
       if (textRef.current) textRef.current.value = "";
       setStatus("idle");
-      setToast(parsed.confidence < 0.6 ? "Entry bani hai — ek sawaal poochhna hai." : "Entry ban gayi, confirm kijiye.");
+      const unsure = drafts.some((d) => d.confidence < 0.6);
+      setToast(unsure ? "Entry bani hai — ek sawaal poochhna hai." : "Entry ban gayi, confirm kijiye.");
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "Kuch galat ho gaya");
       setStatus("error");
@@ -117,6 +160,52 @@ export default function Home() {
           into a confirmed order or ledger entry. No typing while customers wait.
         </p>
       </header>
+
+      {/* API key status: the app must start fully usable with no key (demo parser) */}
+      {mounted && !keyReady && (
+        <section
+          aria-label="API key setup"
+          className="mt-6 rounded-card border border-[#E4C88A] bg-[#FBF3DF] p-4"
+        >
+          <p className="text-sm font-semibold text-[#7A5A12]">
+            API key set nahi hai — abhi demo parser chal raha hai.
+          </p>
+          <p className="mt-1 text-sm text-[#8A6B22]">
+            Voice processing ke liye apni OpenAI key yahan daaliye. Key sirf is browser session mein
+            rehti hai, server par save nahi hoti.
+          </p>
+          <form className="mt-3 flex flex-col gap-2 sm:flex-row" onSubmit={saveKey}>
+            <input
+              id="api-key"
+              type="password"
+              autoComplete="off"
+              value={keyInput}
+              onChange={(e) => setKeyInput(e.target.value)}
+              placeholder="sk-..."
+              className="w-full rounded-card border border-[#E4C88A] bg-white px-3 py-2 text-base text-ink"
+            />
+            <button
+              type="button"
+              onClick={saveKey}
+              className="shrink-0 rounded-card bg-ink px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
+            >
+              Key save kijiye
+            </button>
+          </form>
+        </section>
+      )}
+      {mounted && apiKey && !hasServerKey && (
+        <p className="mt-6 flex items-center justify-between gap-3 rounded-card border border-[#B9D3B0] bg-[#EFF5EC] p-3 text-sm text-[#3C6B2F]">
+          <span>API key set — ab real model se parsing hogi.</span>
+          <button
+            type="button"
+            onClick={removeKey}
+            className="shrink-0 text-xs font-semibold underline hover:opacity-80"
+          >
+            Key hatayein
+          </button>
+        </p>
+      )}
 
       {/* Mic control: the dominant element on the counter */}
       <section
@@ -169,7 +258,7 @@ export default function Home() {
           <label htmlFor="typed" className="block text-sm font-medium text-inkSoft">
             Ya type karke boliye (mic na chale to)
           </label>
-          <div className="mt-2 flex gap-2">
+          <div className="mt-2 flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
             <input
               id="typed"
               ref={textRef}
@@ -249,7 +338,7 @@ export default function Home() {
         <div
           role="status"
           aria-live="polite"
-          className="fixed inset-x-4 bottom-4 mx-auto max-w-sm rounded-card bg-ink px-4 py-3 text-center text-sm font-semibold text-white shadow-lg"
+          className="mt-6 rounded-card bg-ink px-4 py-3 text-center text-sm font-semibold text-white shadow-lg"
         >
           {toast}
         </div>

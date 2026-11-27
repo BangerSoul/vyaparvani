@@ -16,7 +16,7 @@ const LEDGER_WORDS = new Set(["udhaar", "udhar", "khata", "baki", "jama", "wasoo
 
 const STOP = new Set(["aur", "and", "bhej", "bhejo", "do", "dene", "dena", "chahiye", "ko", "ka", "ke", "ki", "se", "liye", "mujhe", "bhaiya", "please", "kar", "karo", "hai", "hain", "tha", "thi", "the", "ho", "gaya", "likh", "clear", "to", "for", "send"]);
 
-const PARTY_SUFFIX = new Set(["store", "kirana", "shop", "traders"]);
+const PARTY_SUFFIX = new Set(["store", "kirana", "shop", "traders", "trader"]);
 
 const PRODUCT_FIXES: Record<string, string> = {
   chawal: "chawal (rice)", atta: "atta (flour)", dal: "dal", chini: "chini (sugar)",
@@ -46,9 +46,14 @@ export function parseDemo(input: string): ParsedEntry {
 
   // Party: "<name> store/kirana/..." followed by ko/ke liye/ka/ki/se.
   let party = "";
-  const partyMatch = lower.match(/([a-z]+\s+(?:store|kirana|shop|traders))\s*(?:ko|ke liye|ka|ki|se)/) ||
-    lower.match(/(?:ko|ke liye)\s*([a-z]+\s+(?:store|kirana|shop|traders))/);
+  const partyMatch = lower.match(/([a-z]+\s+(?:store|kirana|shop|traders|trader))\s*(?:ko|ke liye|ka|ki|se)/) ||
+    lower.match(/(?:ko|ke liye)\s*([a-z]+\s+(?:store|kirana|shop|traders|trader))/);
   if (partyMatch) party = titleCase(partyMatch[1]);
+  // Ledger without a store suffix: "suresh ka 500 udhaar" — the name before ka/ki.
+  if (!party && isLedger) {
+    const nameMatch = lower.match(/\b([a-z]+)\s+(?:ka|ki)\s+/);
+    if (nameMatch) party = titleCase(nameMatch[1]);
+  }
 
   // Due date from the original text, before time words are stripped.
   const dueDate = /\bkal\b|\btomorrow\b/.test(lower) ? relativeDate(1) : "";
@@ -174,6 +179,28 @@ export function parseDemo(input: string): ParsedEntry {
     missing,
     clarification,
   });
+}
+
+// One utterance can carry two instructions ("...order karo aur ... udhaar likho").
+// Split on aur/and and accept the split only when every clause parses cleanly on
+// its own (confident, nothing missing, party known) — otherwise keep one entry,
+// which is what mixed single-instruction utterances like
+// "Gupta store ko 5 kg chawal bhej do aur unka 200 udhaar tha" must stay as.
+export function parseDemoUtterance(input: string): ParsedEntry[] {
+  const clauses = input.split(/\s+(?:aur|and)\s+/i).map((s) => s.trim()).filter(Boolean);
+  if (clauses.length > 1) {
+    const parsed = clauses.map((c) => {
+      try {
+        return parseDemo(c);
+      } catch {
+        return null;
+      }
+    });
+    if (parsed.every((p) => p && p.confidence >= 0.6 && p.missing.length === 0 && p.party)) {
+      return parsed as ParsedEntry[];
+    }
+  }
+  return [parseDemo(input)];
 }
 
 function titleCase(s: string) {
