@@ -70,45 +70,44 @@ jobs:
           name: ui-screenshot
           path: decks/assets/ui-screenshot.png
           retention-days: 7
+          if-no-files-found: error
 
       - name: Setup Python for deck verification
-        if: hashFiles('scripts/build-deck.py') != ''
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
       - name: Build and verify PDF deck
-        if: hashFiles('scripts/build-deck.py') != ''
         run: |
           set -euo pipefail
-          if [ -f scripts/build-deck.py ] && [ -f decks/assets/ui-screenshot.png ]; then
-            pip install --quiet reportlab pillow
-            sudo apt-get update -qq
-            sudo apt-get install -y -qq poppler-utils
-            python3 scripts/build-deck.py --deck decks/vyaparvani-idea.deck.json --output /tmp/vyaparvani-idea.pdf
-            pdfinfo /tmp/vyaparvani-idea.pdf
-            python3 - <<'PY'
+          test -f scripts/build-deck.py || { echo "Missing scripts/build-deck.py"; exit 1; }
+          test -f decks/assets/ui-screenshot.png || { echo "Missing decks/assets/ui-screenshot.png"; exit 1; }
+          pip install --quiet reportlab pillow
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq poppler-utils
+          python3 scripts/build-deck.py --deck decks/vyaparvani-idea.deck.json --output /tmp/vyaparvani-idea.pdf
+          pdfinfo /tmp/vyaparvani-idea.pdf
+          python3 - <<'PY'
           import os, subprocess
           pdf = "/tmp/vyaparvani-idea.pdf"
           size = os.path.getsize(pdf)
           assert size <= 10 * 1024 * 1024, f"PDF too large: {size} bytes"
           info = subprocess.check_output(["pdfinfo", pdf]).decode()
-          assert "Pages:           12" in info or "Pages:          12" in info or any(line.strip() == "Pages: 12" or (line.startswith("Pages:") and line.split()[1] == "12") for line in info.splitlines()), f"Unexpected page count:\n{info}"
+          assert any(line.startswith("Pages:") and line.split()[1] == "12" for line in info.splitlines()), f"Unexpected page count:\n{info}"
           for p in range(1, 13):
               txt = subprocess.check_output(["pdftotext", "-f", str(p), "-l", str(p), pdf, "-"]).decode().strip()
               assert len(txt) > 20, f"Page {p} has empty/insufficient text: {txt!r}"
               print(f"Page {p:02d}: {len(txt)} chars OK")
           print(f"Verified PDF size: {size} bytes")
           PY
-          fi
 
       - name: Upload deck PDF artifact
-        if: hashFiles('scripts/build-deck.py') != ''
         uses: actions/upload-artifact@v4
         with:
           name: vyaparvani-idea-pdf
           path: /tmp/vyaparvani-idea.pdf
           retention-days: 7
+          if-no-files-found: error
 
   docker-build:
     runs-on: ubuntu-latest

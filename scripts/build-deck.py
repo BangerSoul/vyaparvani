@@ -289,18 +289,32 @@ def render_cover(cv: canvas.Canvas, slide: dict, _root: Path) -> None:
     sh = draw_para(cv, slide.get("subtitle", ""), MARGIN_X, y, 720, sub_style)
     y += sh + 34
 
-    # Subtle capability chips
-    chips = [
-        ("Hinglish + Devanagari", PALETTE["accent_soft"], PALETTE["accent"]),
-        ("No-key Demo Mode", PALETTE["accent2_soft"], PALETTE["accent2"]),
-        ("26/26 Golden Eval", PALETTE["surface"], PALETTE["text"]),
+    # Subtle capability chips (driven by deck.json)
+    tone_map = {
+        "accent": (PALETTE["accent_soft"], PALETTE["accent"]),
+        "accent2": (PALETTE["accent2_soft"], PALETTE["accent2"]),
+        "neutral": (PALETTE["surface"], PALETTE["text"]),
+    }
+    default_tones = ["accent", "accent2", "neutral"]
+    raw_chips = slide.get("chips") or [
+        {"label": "Hinglish + Devanagari", "tone": "accent"},
+        {"label": "No-key Demo Mode", "tone": "accent2"},
+        {"label": "26/26 Golden Eval", "tone": "neutral"},
     ]
     cx = MARGIN_X
-    chip_st = make_style("chip", font="VV-Bold", size=9.5, leading=12, color=PALETTE["text"])
-    for label, bg, fg in chips:
+    for i, chip in enumerate(raw_chips):
+        if isinstance(chip, str):
+            label = chip
+            tone = default_tones[i % len(default_tones)]
+        else:
+            label = chip.get("label", "")
+            tone = chip.get("tone", default_tones[i % len(default_tones)])
+        if not label:
+            continue
+        bg, fg = tone_map.get(tone, (PALETTE["surface"], PALETTE["text"]))
         w = pdfmetrics.stringWidth(label, "VV-Bold", 9.5) + 24
         draw_round_box(cv, cx, y, w, 26, fill=bg, stroke=PALETTE["border"], stroke_w=0.9, radius=13)
-        st = make_style("chip_c", font="VV-Bold", size=9.5, leading=12, color=fg)
+        st = make_style(f"chip_c_{i}", font="VV-Bold", size=9.5, leading=12, color=fg)
         draw_para(cv, label, cx + 12, y + 7, w - 20, st)
         cx += w + 12
 
@@ -846,7 +860,7 @@ def render_closing(cv: canvas.Canvas, slide: dict, _root: Path) -> None:
     sh = draw_para(cv, slide.get("subtitle", ""), MARGIN_X + 70, y, CONTENT_W - 140, s_st)
     y += sh + 34
 
-    cmd = "docker compose up"
+    cmd = slide.get("command", "docker compose up")
     cmd_w = pdfmetrics.stringWidth(cmd, "VV-Mono", 12.0) + 44
     cmd_x = (PAGE_W - cmd_w) / 2.0
     draw_round_box(cv, cmd_x, y, cmd_w, 36, fill=PALETTE["text"], radius=18)

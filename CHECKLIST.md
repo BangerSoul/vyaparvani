@@ -61,8 +61,8 @@
 - [x] Fix Slide 3: render `decks/vyaparvani-idea.deck.json` `body` narrative cleanly
 - [x] Fix Slide 4 (`REC-05`): replace diagonal-striped placeholder with the real UI screenshot (`decks/assets/ui-screenshot.png`)
 - [x] Fix Slide 6 (`REC-05`): show accuracy % across categories with explicit sample sizes (`n=21`, `n=4`, `n=1`) and clearly distinguish Demo Regex Eval vs. Live `gpt-4o-mini` LLM Eval
-- [x] Fix Slide 8 (Round 2 Req 3.3): add dependency cost estimates, rate-limit handling (`429` backoff), and outage fallback details to the architecture/dependency table
-- [x] Fix Slide 12 (`REC-05`): align `"Wispr Flow"` claim with actual shipped Wispr Flow Dictation Mode + Web Speech / Whisper fallback
+- [x] Fix Slide 8 (Round 2 Req 3.3): add dependency cost estimates, rate-limit handling (1x 429 retry today; backoff in M4), and outage/no-key fallback details matching shipped code
+- [x] Fix Slide 12 (REC-05): align "Wispr Flow" claim with shipped Web Speech + typed Hinglish workflow today and tag Wispr Flow Dictation Mode / Whisper fallback as (M3) until REC-06 ships
 - [x] Generate `/home/bangersoul/Projects/vyaparvani/vyaparvani-idea.pdf` and verify `<= 10 MB`, 12 slides, non-empty `pdftotext` output on every slide (1–12), and visual inspection via `pdftoppm`
 
 ---
