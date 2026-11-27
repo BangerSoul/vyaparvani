@@ -52,7 +52,7 @@ try {
   });
   await page.waitForTimeout(300);
 
-  await page.screenshot({ path: resolvedOut, fullPage: false });
+  await page.screenshot({ path: resolvedOut, fullPage: true });
   console.log(`Captured UI screenshot to ${resolvedOut}`);
 } finally {
   await browser.close();
