@@ -1,6 +1,7 @@
 {
   "name": "vyaparvani",
   "version": "0.1.0",
+  "description": "Voice-first Hinglish & Devanagari inventory, order, and khata assistant for India's small retailers.",
   "private": true,
   "scripts": {
     "dev": "next dev",

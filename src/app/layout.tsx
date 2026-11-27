@@ -4,7 +4,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "VyaparVani — bolo, samajh gaya, likh diya",
   description:
-    "Voice-first inventory, order and khata assistant for India's small retailers. Speak in Hinglish; VyaparVani writes the entry.",
+    "Voice-first Hinglish & Devanagari order, khata, and stock assistant for India's kirana stores. Speak naturally; VyaparVani structures, clarifies, and confirms the entry.",
 };
 
 export const viewport: Viewport = {
