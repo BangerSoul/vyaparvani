@@ -1,8 +1,8 @@
 # VyaparVani — Resumable P0–P3 Implementation Checklist
 
-- **Last Updated**: 2026-11-27T11:44:00Z
-- **Current Milestone**: M2 Complete -> Ready for M3 (`REC-06`–`REC-10` P1 Differentiation & Core Product Loops)
-- **Next Resumable Step**: M3 — Implement `REC-06` (Wispr Flow Dictation Mode + `/api/transcribe` Whisper fallback), `REC-07` (`ledgerAction` + `Khata (Parties)`), `REC-08` (WhatsApp + CSV), `REC-09` (stock), `REC-10` (Hands-free + TTS)
+- **Last Updated**: 2026-11-27T16:05:00Z
+- **Current Milestone**: M3 IN PROGRESS — `REC-06` complete, proceeding to `REC-07`
+- **Next Resumable Step**: M3 — Implement `REC-07` (`ledgerAction` + `Khata (Parties)`), `REC-08` (WhatsApp + CSV), `REC-09` (stock), `REC-10` (Hands-free + TTS)
 - **Repository Branch**: `feat/round2-submission` (branched from `master` @ `42448d4`)
 
 ---
@@ -70,9 +70,9 @@
 ## M3 — P1 Differentiation & Core Product Loops (`REC-06`–`REC-10`)
 
 ### REC-06: Wispr Flow Dictation Mode + Whisper Audio Fallback (`/api/transcribe`)
-- [ ] Add `POST /api/transcribe` (`src/app/api/transcribe/route.ts`) accepting `multipart/form-data` audio blob for OpenAI Whisper transcription (server key or `x-openai-key`)
-- [ ] Implement `WhisperApiAdapter` (`MediaRecorder` -> `/api/transcribe`) in `src/lib/speech-adapter.ts` for Safari/Firefox and noisy-counter fallback when key is available
-- [ ] Add `"Wispr Flow Dictation Mode"` in `src/app/page.tsx` (auto-focus/pause-triggered auto-parse listener on `#typed` + documented kirana Hinglish custom dictionary/snippets drawer)
+- [x] Add `POST /api/transcribe` (`src/app/api/transcribe/route.ts`) accepting `multipart/form-data` audio blob for OpenAI Whisper transcription (server key or `x-openai-key`)
+- [x] Implement `WhisperApiAdapter` (`MediaRecorder` -> `/api/transcribe`) in `src/lib/speech-adapter.ts` for Safari/Firefox and noisy-counter fallback when key is available
+- [x] Add `"Wispr Flow Dictation Mode"` in `src/app/page.tsx` (auto-focus/pause-triggered auto-parse listener on `#typed` + documented kirana Hinglish custom dictionary/snippets drawer)
 
 ### REC-07: Signed Khata Direction (`ledgerAction`) & `Khata (Parties)` Tab
 - [ ] Add `ledgerAction: z.enum(["credit_given", "payment_received"]).nullable().default(null)` to `src/lib/schema.ts` and `Entry` in `src/lib/store.ts`

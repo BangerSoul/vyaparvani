@@ -1,12 +1,37 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import MicControl from "@/components/MicControl";
 import EntryCard from "@/components/EntryCard";
 import { loadEntries, saveEntries, toDraft, type Entry } from "@/lib/store";
 import type { ParsedEntry } from "@/lib/schema";
+import {
+  WebSpeechAdapter,
+  WhisperApiAdapter,
+  type SpeechInputAdapter,
+} from "@/lib/speech-adapter";
 
 type Status = "idle" | "listening" | "parsing" | "error";
+
+const KIRANA_DICTIONARY_TERMS = [
+  "drib",
+  "kalawa",
+  "peti",
+  "darjan",
+  "wasooli",
+  "udhaar",
+  "chawal",
+  "atta",
+  "Gupta Store",
+  "Sharma Kirana",
+];
+
+const WISPR_SNIPPETS = [
+  "5 kg chawal Gupta store ko bhej do",
+  "1 drib tel Verma store ke liye",
+  "8 kalawa agarbatti Sharma kirana ko",
+  "Sharma kirana se 300 wasooli",
+];
 
 export default function Home() {
   const [entries, setEntries] = useState<Entry[]>([]);
@@ -21,7 +46,20 @@ export default function Home() {
   const [apiKey, setApiKey] = useState("");
   const [keyInput, setKeyInput] = useState("");
   const [clarifyingEntryId, setClarifyingEntryId] = useState<string | null>(null);
+  const [wisprMode, setWisprMode] = useState(false);
+  const [showDictionary, setShowDictionary] = useState(false);
+  const [useWhisperFallback, setUseWhisperFallback] = useState(false);
   const textRef = useRef<HTMLInputElement>(null);
+  const wisprTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const apiKeyRef = useRef(apiKey);
+  apiKeyRef.current = apiKey;
+
+  const clearWisprTimer = useCallback(() => {
+    if (wisprTimerRef.current) {
+      clearTimeout(wisprTimerRef.current);
+      wisprTimerRef.current = null;
+    }
+  }, []);
 
   const clarifyingEntry = useMemo(
     () => entries.find((e) => e.id === clarifyingEntryId) ?? null,
@@ -42,6 +80,30 @@ export default function Home() {
   }, []);
 
   const keyReady = Boolean(apiKey) || hasServerKey;
+
+  const webSpeechSupported = useMemo(
+    () => (mounted ? new WebSpeechAdapter("hi-IN").isSupported() : true),
+    [mounted],
+  );
+
+  const speechAdapter = useMemo<SpeechInputAdapter>(() => {
+    if (mounted && keyReady && (!webSpeechSupported || useWhisperFallback)) {
+      return new WhisperApiAdapter({ getApiKey: () => apiKeyRef.current });
+    }
+    return new WebSpeechAdapter("hi-IN");
+  }, [mounted, keyReady, webSpeechSupported, useWhisperFallback]);
+
+  const usingWhisper = mounted && keyReady && (!webSpeechSupported || useWhisperFallback);
+
+  useEffect(() => {
+    if (wisprMode) {
+      textRef.current?.focus();
+    } else {
+      clearWisprTimer();
+    }
+  }, [wisprMode, clearWisprTimer]);
+
+  useEffect(() => () => clearWisprTimer(), [clearWisprTimer]);
 
   function saveKey(e: React.FormEvent) {
     e.preventDefault();
@@ -93,6 +155,7 @@ export default function Home() {
   const readTyped = () => (textRef.current?.value || "").trim();
 
   async function parseAndAdd(text: string) {
+    clearWisprTimer();
     const utterance = text.trim();
     if (!utterance) return;
     setStatus("parsing");
@@ -154,7 +217,10 @@ export default function Home() {
         );
         setClarifyingEntryId(null);
         setTranscript("");
-        if (textRef.current) textRef.current.value = "";
+        if (textRef.current) {
+          textRef.current.value = "";
+          if (wisprMode) textRef.current.focus();
+        }
         setStatus("idle");
         const stillUnsure = patched.confidence < 0.6 || (patched.missing?.length ?? 0) > 0;
         setToast(
@@ -168,7 +234,10 @@ export default function Home() {
       const drafts = parsed.entries.map((e) => toDraft(e, utterance, mode));
       setEntries((prev) => [...drafts, ...prev]);
       setTranscript("");
-      if (textRef.current) textRef.current.value = "";
+      if (textRef.current) {
+        textRef.current.value = "";
+        if (wisprMode) textRef.current.focus();
+      }
       setStatus("idle");
       const unsure = drafts.some((d) => d.confidence < 0.6 || d.missing.length > 0);
       setToast(unsure ? "Entry bani hai — ek sawaal poochhna hai." : "Entry ban gayi, confirm kijiye.");
@@ -300,6 +369,7 @@ export default function Home() {
           <MicControl
             listening={listening}
             disabled={!mounted || status === "parsing"}
+            adapter={speechAdapter}
             onStart={() => {
               setStatus("listening");
               setErrorMsg("");
@@ -312,7 +382,26 @@ export default function Home() {
             }}
           />
           <div className="w-full sm:max-w-xs">
-            <h2 className="text-sm font-semibold text-inkSoft">Live transcript</h2>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-sm font-semibold text-inkSoft">Live transcript</h2>
+              {mounted && keyReady && (
+                <button
+                  type="button"
+                  aria-pressed={usingWhisper}
+                  onClick={() => setUseWhisperFallback((v) => !v)}
+                  disabled={!webSpeechSupported}
+                  className={[
+                    "rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors",
+                    usingWhisper
+                      ? "border-saffron bg-[#FBF1E3] text-saffronDeep"
+                      : "border-line bg-surface text-inkSoft hover:bg-[#F3EDE0]",
+                    !webSpeechSupported ? "cursor-default" : "",
+                  ].join(" ")}
+                >
+                  {usingWhisper ? "Whisper ASR ON" : "Whisper ASR"}
+                </button>
+              )}
+            </div>
             <p
               aria-live="polite"
               className="mt-2 min-h-[3.5rem] rounded-card bg-surface p-3 text-base leading-relaxed text-ink"
@@ -336,9 +425,80 @@ export default function Home() {
           className="mt-5 border-t border-line pt-4"
           onSubmit={(e) => {
             e.preventDefault();
+            clearWisprTimer();
             parseAndAdd(readTyped());
           }}
         >
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-semibold text-ink">
+              <input
+                type="checkbox"
+                checked={wisprMode}
+                onChange={(e) => setWisprMode(e.target.checked)}
+                className="h-4 w-4 rounded border-line accent-saffron"
+              />
+              <span>Wispr Flow Dictation Mode</span>
+              <span className="font-normal text-inkSoft">
+                (auto-focus + pause auto-parse)
+              </span>
+            </label>
+            <button
+              type="button"
+              aria-expanded={showDictionary}
+              onClick={() => setShowDictionary((v) => !v)}
+              className="rounded-card border border-line bg-surface px-2.5 py-1 text-xs font-semibold text-ink hover:bg-[#F3EDE0]"
+            >
+              Kirana dictionary (Wispr Flow)
+            </button>
+          </div>
+          {showDictionary && (
+            <div className="mb-3 rounded-card border border-line bg-surface p-3 text-xs">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="font-semibold text-ink">
+                  Wispr Flow custom dictionary terms (Hinglish kirana)
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard?.writeText(KIRANA_DICTIONARY_TERMS.join(", "));
+                    setToast("Kirana dictionary copied.");
+                  }}
+                  className="rounded-card border border-line bg-white px-2.5 py-1 font-semibold text-ink hover:bg-[#F3EDE0]"
+                >
+                  Copy dictionary
+                </button>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {KIRANA_DICTIONARY_TERMS.map((term) => (
+                  <span
+                    key={term}
+                    className="rounded-full border border-line bg-white px-2 py-0.5 text-inkSoft"
+                  >
+                    {term}
+                  </span>
+                ))}
+              </div>
+              <p className="mt-2.5 font-semibold text-inkSoft">Quick dictation snippets:</p>
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {WISPR_SNIPPETS.map((snippet) => (
+                  <button
+                    key={snippet}
+                    type="button"
+                    onClick={() => {
+                      clearWisprTimer();
+                      if (textRef.current) {
+                        textRef.current.value = snippet;
+                        textRef.current.focus();
+                      }
+                    }}
+                    className="rounded-card border border-line bg-white px-2.5 py-1 text-left text-ink hover:border-saffron hover:bg-[#FBF1E3]"
+                  >
+                    {snippet}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           {clarifyingEntry && (
             <div
               role="status"
@@ -361,12 +521,26 @@ export default function Home() {
           <label htmlFor="typed" className="block text-sm font-medium text-inkSoft">
             {clarifyingEntry
               ? "Is entry ka jawaab boliye ya type kijiye"
-              : "Ya type karke boliye (mic na chale to)"}
+              : wisprMode
+                ? "Wispr Flow active — seedha boliye, rukne par auto-parse hoga"
+                : "Ya type karke boliye (mic na chale to)"}
           </label>
           <div className="mt-2 flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
             <input
               id="typed"
               ref={textRef}
+              onChange={(e) => {
+                clearWisprTimer();
+                if (!wisprMode || status === "parsing") return;
+                const val = e.target.value.trim();
+                const words = val.split(/\s+/).filter(Boolean).length;
+                if (words >= 2 || /[.!?।]$/.test(val)) {
+                  wisprTimerRef.current = setTimeout(() => {
+                    const current = readTyped();
+                    if (current) void parseAndAdd(current);
+                  }, 1100);
+                }
+              }}
               className="w-full rounded-card border border-line bg-surface px-3 py-2 text-base text-ink"
               placeholder="5 kg chawal Gupta store ko bhej do"
               defaultValue=""
