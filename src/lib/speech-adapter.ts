@@ -81,6 +81,7 @@ export class WebSpeechAdapter implements SpeechInputAdapter {
     this.rec = rec;
 
     rec.onresult = (e: SpeechRecognitionResultEventLike) => {
+      if (this.rec !== rec) return;
       let finalChunk = "";
       let interim = "";
       for (let i = e.resultIndex; i < e.results.length; i++) {
@@ -167,7 +168,9 @@ export class WhisperApiAdapter implements SpeechInputAdapter {
   private preferredMimeType?: string;
   private recorder: MediaRecorder | null = null;
   private stream: MediaStream | null = null;
+  private uploadController: AbortController | null = null;
   private cancelled = false;
+  private recordingId = 0;
 
   constructor(options: WhisperAdapterOptions = {}) {
     this.getApiKey = options.getApiKey;
@@ -183,16 +186,22 @@ export class WhisperApiAdapter implements SpeechInputAdapter {
     );
   }
 
-  private stopTracks() {
-    if (!this.stream) return;
-    for (const track of this.stream.getTracks()) {
+  private stopStream(stream: MediaStream | null) {
+    if (!stream) return;
+    for (const track of stream.getTracks()) {
       try {
         track.stop();
       } catch {
         // ignore track stop errors
       }
     }
-    this.stream = null;
+    if (this.stream === stream) {
+      this.stream = null;
+    }
+  }
+
+  private stopTracks() {
+    this.stopStream(this.stream);
   }
 
   start(callbacks: SpeechInputCallbacks): void {
@@ -202,9 +211,19 @@ export class WhisperApiAdapter implements SpeechInputAdapter {
       return;
     }
 
+    const sessionId = ++this.recordingId;
+    if (this.uploadController) {
+      this.uploadController.abort();
+      this.uploadController = null;
+    }
+
     if (this.recorder && this.recorder.state !== "inactive") {
+      const prevRecorder = this.recorder;
+      prevRecorder.ondataavailable = null;
+      prevRecorder.onerror = null;
+      prevRecorder.onstop = null;
       try {
-        this.recorder.stop();
+        prevRecorder.stop();
       } catch {
         // ignore cleanup error
       }
@@ -213,14 +232,23 @@ export class WhisperApiAdapter implements SpeechInputAdapter {
     this.recorder = null;
     this.cancelled = false;
 
-    void this.beginRecording(callbacks);
+    void this.beginRecording(callbacks, sessionId);
   }
 
-  private async beginRecording(callbacks: SpeechInputCallbacks): Promise<void> {
+  private async beginRecording(
+    callbacks: SpeechInputCallbacks,
+    sessionId: number,
+  ): Promise<void> {
+    let localStream: MediaStream | null = null;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      localStream = stream;
+      if (sessionId !== this.recordingId) {
+        this.stopStream(stream);
+        return;
+      }
       if (this.cancelled) {
-        for (const t of stream.getTracks()) t.stop();
+        this.stopStream(stream);
         callbacks.onEnd?.();
         return;
       }
@@ -234,21 +262,26 @@ export class WhisperApiAdapter implements SpeechInputAdapter {
 
       const chunks: BlobPart[] = [];
       recorder.ondataavailable = (e: BlobEvent) => {
+        if (sessionId !== this.recordingId) return;
         if (e.data && e.data.size > 0) chunks.push(e.data);
       };
 
       recorder.onerror = () => {
-        this.stopTracks();
-        this.recorder = null;
+        this.stopStream(stream);
+        if (this.recorder === recorder) this.recorder = null;
+        if (sessionId !== this.recordingId) return;
         callbacks.onError?.("audio-recording-error");
         callbacks.onEnd?.();
       };
 
       recorder.onstop = async () => {
         const activeMime = recorder.mimeType || chosenMime || "audio/webm";
-        this.stopTracks();
-        this.recorder = null;
+        this.stopStream(stream);
+        if (this.recorder === recorder) this.recorder = null;
 
+        if (sessionId !== this.recordingId) {
+          return;
+        }
         if (this.cancelled || chunks.length === 0) {
           callbacks.onEnd?.();
           return;
@@ -262,6 +295,8 @@ export class WhisperApiAdapter implements SpeechInputAdapter {
         const blob = new Blob(chunks, { type: activeMime });
         callbacks.onInterim?.("Whisper se audio samajh raha hoon…");
 
+        const controller = new AbortController();
+        this.uploadController = controller;
         try {
           const form = new FormData();
           form.append("audio", blob, `recording.${ext}`);
@@ -270,11 +305,14 @@ export class WhisperApiAdapter implements SpeechInputAdapter {
             method: "POST",
             headers: apiKey ? { "x-openai-key": apiKey } : undefined,
             body: form,
+            signal: controller.signal,
           });
+          if (sessionId !== this.recordingId || this.cancelled) return;
           const payload = (await res.json().catch(() => ({}))) as {
             text?: string;
             error?: string;
           };
+          if (sessionId !== this.recordingId || this.cancelled) return;
           if (!res.ok) {
             callbacks.onError?.(payload.error || `Whisper error (${res.status})`);
             return;
@@ -285,19 +323,28 @@ export class WhisperApiAdapter implements SpeechInputAdapter {
             callbacks.onResult?.(text, "");
           }
         } catch (err: unknown) {
+          if (sessionId !== this.recordingId || this.cancelled) return;
           callbacks.onError?.(
             err instanceof Error ? err.message : "Whisper upload failed",
           );
         } finally {
-          callbacks.onEnd?.();
+          if (this.uploadController === controller) {
+            this.uploadController = null;
+          }
+          if (sessionId === this.recordingId) {
+            callbacks.onEnd?.();
+          }
         }
       };
 
       recorder.start();
-      callbacks.onInterim?.("Audio record ho raha hai…");
+      if (sessionId === this.recordingId) {
+        callbacks.onInterim?.("Audio record ho raha hai…");
+      }
     } catch (err: unknown) {
-      this.stopTracks();
+      this.stopStream(localStream);
       this.recorder = null;
+      if (sessionId !== this.recordingId) return;
       const name = err instanceof Error ? err.name : "";
       callbacks.onError?.(
         name === "NotAllowedError"

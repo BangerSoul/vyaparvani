@@ -21,6 +21,8 @@ export const DEFAULT_STOCK: StockItem[] = [
   { sku: "namak", label: "namak (salt)", quantity: 10, unit: "kg", lowThreshold: 3 },
 ];
 
+const KNOWN_DEFAULT_SKUS = new Set(DEFAULT_STOCK.map((s) => s.sku));
+
 const SKU_ALIASES: Record<string, string> = {
   rice: "chawal",
   flour: "atta",
@@ -41,8 +43,16 @@ export function normalizeSkuKey(product: string): string {
     .split(/\s+/)
     .filter(Boolean);
   if (cleaned.length === 0) return "";
-  const first = cleaned[0];
-  return SKU_ALIASES[first] ?? first;
+  for (let i = 0; i < cleaned.length - 1; i++) {
+    const pair = `${cleaned[i]} ${cleaned[i + 1]}`;
+    if (KNOWN_DEFAULT_SKUS.has(pair)) return pair;
+    if (SKU_ALIASES[pair]) return SKU_ALIASES[pair];
+  }
+  for (const tok of cleaned) {
+    if (KNOWN_DEFAULT_SKUS.has(tok)) return tok;
+    if (SKU_ALIASES[tok]) return SKU_ALIASES[tok];
+  }
+  return cleaned[0];
 }
 
 export function loadStock(): StockItem[] {
@@ -126,10 +136,26 @@ export function applyOrderStockDeduction(
 export function parseRestockIntent(utterance: string): boolean {
   const s = utterance.trim();
   if (!s) return false;
+  // Reject customer orders / dispatches from stock or addressed to a store/party.
+  if (/\b(?:stock|inventory)\s*me(?:in)?\s+se\b/i.test(s)) return false;
+  if (/\b(?:bhej|bhejo|bhejna|deliver|dispatch)\b/i.test(s)) return false;
+  if (/\bstock\s+(?:store|kirana|shop|traders|trader|mart|bhandar|agency)\b/i.test(s)) return false;
+  if (/\b(?:store|kirana|shop|traders|trader|mart|bhandar|agency)\s+(?:ko|ke\s+liye)\b/i.test(s)) {
+    return false;
+  }
   if (/\b(?:restock|stock\s*mein|stock\s*me|stock\s*add|inventory\s*mein|inventory\s*me)\b/i.test(s)) {
     return true;
   }
   return /\bstock\b/i.test(s) && /\b(?:add|daal|dalo|daalo|bhar|badhao|plus)\b/i.test(s);
+}
+
+export function stripRestockBoilerplate(utterance: string): string {
+  return utterance
+    .replace(/\b(?:restock|inventory\s*me(?:in)?|stock\s*me(?:in)?)\b/gi, " ")
+    .replace(/\b(?:stock)\b/gi, " ")
+    .replace(/\b(?:add\s+karo|add\s+kar\s+do|add|daal\s+do|daalo|dalo|bhar\s+do|badhao|karo)\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 export function applyRestock(

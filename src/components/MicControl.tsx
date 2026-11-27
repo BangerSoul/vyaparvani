@@ -25,10 +25,12 @@ export default function MicControl({
   adapter,
 }: Props) {
   const [supported, setSupported] = useState(true);
+  const [transcribing, setTranscribing] = useState(false);
   const adapterRef = useRef<SpeechInputAdapter | null>(null);
   const finalTextRef = useRef("");
   const latestInterimRef = useRef("");
   const sessionActiveRef = useRef(false);
+  const sessionIdRef = useRef(0);
 
   // Latest callbacks without re-creating the recognition adapter on re-render.
   const cbRef = useRef({ onResult, onStop, onSessionEnd, onError });
@@ -39,20 +41,30 @@ export default function MicControl({
     adapterRef.current = impl;
     setSupported(impl.isSupported());
     return () => {
+      sessionIdRef.current += 1;
       sessionActiveRef.current = false;
+      setTranscribing(false);
       impl.stop();
     };
   }, [adapter]);
 
   function start() {
+    if (transcribing) return;
     const impl = adapterRef.current;
     if (!impl || !impl.isSupported()) return;
+    const sid = ++sessionIdRef.current;
     finalTextRef.current = "";
     latestInterimRef.current = "";
     sessionActiveRef.current = true;
+    setTranscribing(false);
     onStart();
     impl.start({
+      onInterim: (interim) => {
+        if (sid !== sessionIdRef.current) return;
+        cbRef.current.onResult(finalTextRef.current, interim);
+      },
       onResult: (finalChunk, interim) => {
+        if (sid !== sessionIdRef.current) return;
         if (finalChunk) {
           const clean = finalChunk.trim();
           if (clean) {
@@ -65,8 +77,9 @@ export default function MicControl({
         cbRef.current.onResult(finalTextRef.current, interim);
       },
       onEnd: () => {
-        if (!sessionActiveRef.current) return;
+        if (sid !== sessionIdRef.current || !sessionActiveRef.current) return;
         sessionActiveRef.current = false;
+        setTranscribing(false);
         const combined = `${finalTextRef.current} ${latestInterimRef.current}`
           .replace(/\s+/g, " ")
           .trim();
@@ -74,12 +87,17 @@ export default function MicControl({
         cbRef.current.onSessionEnd?.(combined);
       },
       onError: (msg) => {
+        if (sid !== sessionIdRef.current) return;
+        setTranscribing(false);
         cbRef.current.onError(msg);
       },
     });
   }
 
   function stop() {
+    if (sessionActiveRef.current) {
+      setTranscribing(true);
+    }
     adapterRef.current?.stop();
     cbRef.current.onStop();
   }
@@ -89,7 +107,7 @@ export default function MicControl({
       <button
         type="button"
         onClick={listening ? stop : start}
-        disabled={disabled || !supported}
+        disabled={disabled || !supported || transcribing}
         aria-pressed={listening}
         aria-label={listening ? "Stop recording" : "Start recording"}
         className={[
@@ -107,9 +125,11 @@ export default function MicControl({
       <p className="text-sm text-inkSoft" role="status">
         {!supported
           ? "Is browser mein voice nahi chalta — neeche type karke bhi try kijiye."
-          : listening
-            ? "Sun raha hoon… bolte rahiye"
-            : "Mic dabaake boliye"}
+          : transcribing
+            ? "Audio samajh raha hoon…"
+            : listening
+              ? "Sun raha hoon… bolte rahiye"
+              : "Mic dabaake boliye"}
       </p>
     </div>
   );

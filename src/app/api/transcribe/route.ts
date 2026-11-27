@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
   }
 
   const headerKey = (req.headers.get(KEY_HEADER) || "").trim();
-  const apiKey = (process.env.OPENAI_API_KEY || headerKey).trim();
+  const apiKey = (process.env.OPENAI_API_KEY?.trim() || headerKey);
   if (!apiKey) {
     return NextResponse.json(
       { error: "OpenAI API key required for Whisper audio transcription" },

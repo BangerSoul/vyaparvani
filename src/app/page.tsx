@@ -24,6 +24,7 @@ import {
   loadStock,
   parseRestockIntent,
   saveStock,
+  stripRestockBoilerplate,
   type StockItem,
 } from "@/lib/inventory";
 import type { ParsedEntry } from "@/lib/schema";
@@ -271,10 +272,12 @@ export default function Home() {
     setStatus("parsing");
     setErrorMsg("");
     const activeClarify = clarifyingEntry;
+    const isRestock = !activeClarify && parseRestockIntent(utterance);
+    const parseInput = isRestock ? stripRestockBoilerplate(utterance) || utterance : utterance;
     try {
       const payload = activeClarify
         ? {
-            utterance,
+            utterance: parseInput,
             existingEntry: {
               type: activeClarify.type,
               ledgerAction: activeClarify.ledgerAction,
@@ -288,7 +291,7 @@ export default function Home() {
               source: activeClarify.source,
             },
           }
-        : { utterance };
+        : { utterance: parseInput };
       const res = await fetch("/api/parse", {
         method: "POST",
         headers: {
@@ -304,7 +307,7 @@ export default function Home() {
       const parsed: { entries: ParsedEntry[]; mode?: "demo" | "model" } = await res.json();
       const mode = parsed.mode === "model" ? "model" : "demo";
 
-      if (!activeClarify && parseRestockIntent(utterance)) {
+      if (isRestock) {
         const restockItems = parsed.entries.flatMap((e) => e.items);
         const { nextStock, updated } = applyRestock(stock, restockItems);
         setTranscript("");
@@ -980,8 +983,19 @@ export default function Home() {
                       <button
                         type="button"
                         onClick={() => {
-                          const wasooli = buildWasooliEntry(summary.party, summary.netBalance);
-                          setEntries((prev) => [wasooli, ...prev]);
+                          setEntries((prev) => {
+                            const current = computePartyBalances(prev).find(
+                              (p) => p.partyKey === summary.partyKey,
+                            );
+                            if (!current || current.netBalance <= 0) {
+                              return prev;
+                            }
+                            const wasooli = buildWasooliEntry(
+                              current.party || summary.party,
+                              current.netBalance,
+                            );
+                            return [wasooli, ...prev];
+                          });
                           setToast(`${summary.party} ka ₹${summary.netBalance} wasooli record ho gaya.`);
                         }}
                         className="rounded-card bg-ink px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90"

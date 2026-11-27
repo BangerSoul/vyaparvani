@@ -33,9 +33,13 @@ const CREDIT_GIVEN_WORDS = new Set([
   "udhaar", "udhar", "baki", "credit", "lena", "dena",
 ]);
 
+const EXPLICIT_CREDIT_WORDS = new Set([
+  "udhaar", "udhar", "baki", "credit", "khata",
+]);
+
 const LEDGER_INTENT_WORDS = new Set([
   "udhaar", "udhar", "khata", "baki", "jama", "wasooli",
-  "credit", "collection", "lena", "dena", "chukta",
+  "credit", "collection", "lena", "dena", "chukta", "mila", "clear",
 ]);
 
 const CURRENCY_WORDS = new Set([
@@ -45,8 +49,8 @@ const CURRENCY_WORDS = new Set([
 const STOP = new Set([
   "bhej", "bhejo", "do", "dene", "dena", "chahiye", "ko", "ka", "ke", "ki",
   "se", "liye", "mujhe", "bhaiya", "please", "kar", "karo", "hai", "hain",
-  "tha", "thi", "the", "ho", "gaya", "likh", "likho", "clear", "to", "for",
-  "send", "add", "lo",
+  "tha", "thi", "the", "ho", "gaya", "likh", "likho", "clear", "mila", "to",
+  "for", "send", "add", "lo",
 ]);
 
 const SEPARATORS = new Set(["aur", "and", ","]);
@@ -356,18 +360,22 @@ function inferLedgerAction(
   tokens: string[],
   type: "order" | "ledger",
   amount: number | null,
+  hasItems: boolean,
+  hasCurrency: boolean,
 ): ParsedEntry["ledgerAction"] {
   if (tokens.some((t) => PAYMENT_RECEIVED_WORDS.has(t))) {
     return "payment_received";
   }
-  if (
-    tokens.some((t) => CREDIT_GIVEN_WORDS.has(t)) &&
-    (type === "ledger" || amount !== null)
-  ) {
-    return "credit_given";
-  }
   if (type === "ledger") {
     return "credit_given";
+  }
+  if (amount !== null) {
+    if (tokens.some((t) => EXPLICIT_CREDIT_WORDS.has(t))) {
+      return "credit_given";
+    }
+    if (!(hasItems && hasCurrency) && tokens.some((t) => CREDIT_GIVEN_WORDS.has(t))) {
+      return "credit_given";
+    }
   }
   return null;
 }
@@ -449,7 +457,17 @@ export function parseDemo(input: string): ParsedEntry {
       }
       const afterQtyUnit = j;
 
-      while (j < tokens.length && STOP.has(tokens[j])) j++;
+      while (j < tokens.length && STOP.has(tokens[j])) {
+        const stopTok = tokens[j];
+        if (
+          !nextIsUnit &&
+          LEDGER_INTENT_WORDS.has(stopTok) &&
+          !((stopTok === "dena" || stopTok === "lena") && lastProduct !== null)
+        ) {
+          break;
+        }
+        j++;
+      }
 
       // "<qty> <currency> [ka/ki/ke] <product>" -> price-denominated order item + amount
       if (!nextIsUnit && j < tokens.length && CURRENCY_WORDS.has(tokens[j])) {
@@ -474,11 +492,23 @@ export function parseDemo(input: string): ParsedEntry {
         continue;
       }
 
+      const isRestockTrail =
+        j < tokens.length &&
+        (tokens[j] === "restock" ||
+          ((tokens[j] === "stock" || tokens[j] === "inventory") &&
+            !isPartyLeading(j) &&
+            j + 1 < tokens.length &&
+            (tokens[j + 1] === "mein" ||
+              tokens[j + 1] === "me" ||
+              tokens[j + 1] === "add" ||
+              STOP.has(tokens[j + 1]))));
+
       // If clause separator ("aur", "and", ",") or end or party follows, bind lastProduct if pending.
       const atBoundary =
         j >= tokens.length ||
         SEPARATORS.has(tokens[j]) ||
         isPartyLeading(j) ||
+        isRestockTrail ||
         (lastProduct !== null &&
           j + 1 < tokens.length &&
           consumeQuantityAt(tokens, j + 1) !== null);
@@ -497,6 +527,20 @@ export function parseDemo(input: string): ParsedEntry {
 
       if (j < tokens.length && !SEPARATORS.has(tokens[j])) {
         const raw = tokens[j];
+        if (
+          !KNOWN_PRODUCTS.has(raw) &&
+          j + 1 < tokens.length &&
+          KNOWN_PRODUCTS.has(tokens[j + 1]) &&
+          !isPartyLeading(j) &&
+          !isPartyLeading(j + 1) &&
+          !UNITS.has(raw) &&
+          normalizeNumberToken(raw) === null
+        ) {
+          items.push({ product: `${raw} ${tokens[j + 1]}`, quantity: qty, unit });
+          lastProduct = null;
+          i = j + 2;
+          continue;
+        }
         items.push({ product: PRODUCT_FIXES[raw] ?? raw, quantity: qty, unit });
         lastProduct = null;
         i = j + 1;
@@ -516,12 +560,17 @@ export function parseDemo(input: string): ParsedEntry {
   if (amountTokens.length > 0) amount = amountTokens[0];
 
   const type = items.length > 0 ? "order" : (hasLedgerIntent || (amount !== null && hasCurrency)) ? "ledger" : "order";
-  const ledgerAction = inferLedgerAction(tokensAll, type, amount);
+  const ledgerAction = inferLedgerAction(tokensAll, type, amount, items.length > 0, hasCurrency);
 
   let confidence = 0.75;
   if (items.length === 0 && amount === null) {
-    if (!missing.includes("items")) missing.push("items");
-    confidence = 0.3;
+    if (type === "ledger") {
+      if (!missing.includes("amount")) missing.push("amount");
+      confidence = 0.5;
+    } else {
+      if (!missing.includes("items")) missing.push("items");
+      confidence = 0.3;
+    }
   }
   if (sawOrphanQty || missing.includes("product")) {
     confidence = Math.min(confidence, 0.5);
@@ -546,6 +595,8 @@ export function parseDemo(input: string): ParsedEntry {
       clarification = "Kitni matra chahiye?";
     } else if (missing.includes("product")) {
       clarification = "Kaunsa saaman chahiye?";
+    } else if (missing.includes("amount")) {
+      clarification = "Kitne rupaye likhne hain?";
     } else if (missing.includes("party")) {
       clarification =
         type === "ledger"
@@ -618,6 +669,41 @@ function extractClarificationParty(utterance: string): string {
     return titleCase(kept.join(" "));
   }
   return "";
+}
+
+const AMOUNT_FILLER_WORDS = new Set([
+  "ka", "ki", "ke", "hai", "tha", "thi", "the", "likh", "likho", "kar", "karo",
+]);
+
+function parseBareHinglishAmount(tokens: string[]): number | null {
+  if (tokens.length === 0) return null;
+  let total = 0;
+  let sawNumber = false;
+  let i = 0;
+  while (i < tokens.length) {
+    const tok = tokens[i];
+    if (CURRENCY_WORDS.has(tok) || AMOUNT_FILLER_WORDS.has(tok)) {
+      i++;
+      continue;
+    }
+    const c = consumeQuantityAt(tokens, i);
+    if (!c) return null;
+    let val = c.qty;
+    let nextIdx = c.nextIndex;
+    if (nextIdx < tokens.length) {
+      if (tokens[nextIdx] === "sau" && val > 0 && val < 100) {
+        val *= 100;
+        nextIdx++;
+      } else if ((tokens[nextIdx] === "hazaar" || tokens[nextIdx] === "hazar") && val > 0 && val < 1000) {
+        val *= 1000;
+        nextIdx++;
+      }
+    }
+    total += val;
+    sawNumber = true;
+    i = nextIdx;
+  }
+  return sawNumber && total >= 0 ? total : null;
 }
 
 export function mergeDemoClarification(
@@ -722,8 +808,8 @@ export function mergeDemoClarification(
   if (amount === null) {
     if (replyParsed.amount !== null) {
       amount = replyParsed.amount;
-    } else if (type === "ledger" && replyTokens.length === 1) {
-      const bareNum = normalizeNumberToken(replyTokens[0]);
+    } else if (type === "ledger") {
+      const bareNum = parseBareHinglishAmount(replyTokens);
       if (bareNum !== null) amount = bareNum;
     }
   }
@@ -737,7 +823,7 @@ export function mergeDemoClarification(
   if (replyParsed.ledgerAction) {
     ledgerAction = replyParsed.ledgerAction;
   } else if (type === "ledger" && ledgerAction === null) {
-    ledgerAction = inferLedgerAction(replyTokens, type, amount);
+    ledgerAction = inferLedgerAction(replyTokens, type, amount, items.length > 0, false);
   }
 
   // 5. Recompute missing, confidence, clarification cleanly

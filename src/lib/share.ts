@@ -48,11 +48,12 @@ export function buildKhataWhatsAppUrl(summary: PartyKhataSummary): string {
 }
 
 export function escapeCsvCell(value: string): string {
-  const s = String(value ?? "");
-  if (/[",\r\n]/.test(s)) {
-    return `"${s.replace(/"/g, '""')}"`;
+  const raw = String(value ?? "");
+  const safe = /^[=+\-@\t\r]/.test(raw) || /^[\t\r ]*[=+\-@]/.test(raw) ? `'${raw}` : raw;
+  if (/[",\r\n]/.test(safe)) {
+    return `"${safe.replace(/"/g, '""')}"`;
   }
-  return s;
+  return safe;
 }
 
 export function buildDistributorCsv(entries: Entry[]): string {

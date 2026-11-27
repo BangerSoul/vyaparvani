@@ -104,6 +104,11 @@ export default function EntryCard({
       dueDate: draft.dueDate.trim(),
     };
     const missing = computeMissingFromFields(cleaned);
+    const isInvalid =
+      missing.length > 0 ||
+      cleanedItems.some((it) => !Number.isFinite(it.quantity) || it.quantity <= 0) ||
+      (cleanedItems.length === 0 && normalizedAmount === null) ||
+      (cleaned.type === "ledger" && !cleaned.party);
     const confidence = missing.length === 0 ? Math.max(entry.confidence, 0.85) : Math.min(entry.confidence, 0.5);
     const clarification =
       missing.length === 0
@@ -119,6 +124,7 @@ export default function EntryCard({
       missing,
       confidence,
       clarification,
+      status: isInvalid ? "draft" : entry.status,
     });
     setEditing(false);
   }
