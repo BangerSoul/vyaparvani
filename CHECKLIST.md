@@ -1,8 +1,8 @@
 # VyaparVani — Resumable P0–P3 Implementation Checklist
 
-- **Last Updated**: 2026-11-27T11:00:30Z
-- **Current Milestone**: M0 Complete -> Ready for M1 (P0 Critical Demo-Savers)
-- **Next Resumable Step**: M1 — `REC-01` (`MicControl` stop lifecycle, `finalTextRef` accumulation, and `SpeechInputAdapter`)
+- **Last Updated**: 2026-11-27T11:15:00Z
+- **Current Milestone**: M1 Implemented -> Verifying via GitHub Actions CI
+- **Next Resumable Step**: Verify M1 CI pass, then start M2 (`REC-05` & Round 2 Req 3.3 Deck Pipeline Rebuild)
 - **Repository Branch**: `feat/round2-submission` (branched from `master` @ `42448d4`)
 
 ---
@@ -22,36 +22,36 @@
 ## M1 — P0 Critical Demo-Savers (`REC-01`–`REC-04`)
 
 ### REC-01: Fix `MicControl` Stop Lifecycle, Transcript Accumulation & `SpeechInputAdapter`
-- [ ] Extract `SpeechInputAdapter` interface (`isSupported`, `start`, `stop`) in `src/lib/speech-adapter.ts` with `WebSpeechAdapter` implementation
-- [ ] Update `src/components/MicControl.tsx` so clicking Stop invokes `recRef.current?.stop()` / `adapter.stop()` before `onStop`
-- [ ] Accumulate finalized speech segments in `finalTextRef` across `e.resultIndex` events (resetting `finalTextRef.current = ""` on `start()`) and emit `(finalTextRef.current + interim).trim()`
-- [ ] Verify `src/app/page.tsx` transcript state updates cleanly without dropping prior finalized phrases
+- [x] Extract `SpeechInputAdapter` interface (`isSupported`, `start`, `stop`) in `src/lib/speech-adapter.ts` with `WebSpeechAdapter` implementation
+- [x] Update `src/components/MicControl.tsx` so clicking Stop invokes `recRef.current?.stop()` / `adapter.stop()` before `onStop`
+- [x] Accumulate finalized speech segments in `finalTextRef` across `e.resultIndex` events (resetting `finalTextRef.current = ""` on `start()`) and emit `(finalTextRef.current + interim).trim()`
+- [x] Verify `src/app/page.tsx` transcript state updates cleanly without dropping prior finalized phrases
 
 ### REC-02: Harden `demo-parser.ts` & `route.ts` Error Boundary
-- [ ] Wrap `parseDemoUtterance(utterance)` in `src/app/api/parse/route.ts` inside `try/catch` returning structured `400`/`422` JSON instead of HTTP 500
-- [ ] Add Devanagari-to-Hinglish normalization (`०-९` -> `0-9`, `किलो`, `चावल`, `उधार`, `रुपये`, `भेज दो`, etc.) in `src/lib/demo-parser.ts`
-- [ ] Require mandatory `party` on ledger entries (`if (!party)` instead of `if (!party && !isLedger)`), emitting `missing: ["party"]`, `confidence <= 0.55`, and `"Kis ke khate mein likhna hai?"`
-- [ ] Pre-split attached currency/unit tokens (`250rs`, `₹500`, `500/-`, `5kg`) before tokenization/number parsing
-- [ ] Allow `NUM_WORDS` directly before `KNOWN_PRODUCTS` (e.g., `"paanch chawal Gupta store ko bhej do"`) while still guarding trailing verb `"do"`
-- [ ] Fix `lastProduct` binding for `<product> <qty> <unit>` before consuming subsequent items/parties
-- [ ] Fix price-order phrasing (`"50 rupaye ka tel"`, `"100 rs ki chini"`) so orders with prices are not misclassified as ledgers unless ledger intent words appear
-- [ ] Widen `partyMatch`/`nameMatch` (`se` postposition for `wasooli`, multi-word names, `mart`/`bhaiya`/`ji`, guard against `LEDGER_WORDS`/`UNITS`)
-- [ ] Add Indian fractions (`aadha`/`adha`, `paav`/`pao`, `sava`, `dedh`, `dhai`, `saadhe`)
-- [ ] Compute `relativeDate()` using IST (`Asia/Kolkata`) instead of UTC `toISOString()`
+- [x] Wrap `parseDemoUtterance(utterance)` in `src/app/api/parse/route.ts` inside `try/catch` returning structured `400`/`422` JSON instead of HTTP 500
+- [x] Add Devanagari-to-Hinglish normalization (`०-९` -> `0-9`, `किलो`, `चावल`, `उधार`, `रुपये`, `भेज दो`, etc.) in `src/lib/demo-parser.ts`
+- [x] Require mandatory `party` on ledger entries (`if (!party)` instead of `if (!party && !isLedger)`), emitting `missing: ["party"]`, `confidence <= 0.55`, and `"Kis ke khate mein likhna hai?"`
+- [x] Pre-split attached currency/unit tokens (`250rs`, `₹500`, `500/-`, `5kg`) before tokenization/number parsing
+- [x] Allow `NUM_WORDS` directly before `KNOWN_PRODUCTS` (e.g., `"paanch chawal Gupta store ko bhej do"`) while still guarding trailing verb `"do"`
+- [x] Fix `lastProduct` binding for `<product> <qty> <unit>` before consuming subsequent items/parties
+- [x] Fix price-order phrasing (`"50 rupaye ka tel"`, `"100 rs ki chini"`) so orders with prices are not misclassified as ledgers unless ledger intent words appear
+- [x] Widen `partyMatch`/`nameMatch` (`se` postposition for `wasooli`, multi-word names, `mart`/`bhaiya`/`ji`, guard against `LEDGER_WORDS`/`UNITS`)
+- [x] Add Indian fractions (`aadha`/`adha`, `paav`/`pao`, `sava`, `dedh`, `dhai`, `saadhe`)
+- [x] Compute `relativeDate()` using IST (`Asia/Kolkata`) instead of UTC `toISOString()`
 
 ### REC-03: Schema `nonnegative()` Quantity, UI Confirm Guard & Dynamic IST Prompt
-- [ ] Update `src/lib/schema.ts` `quantity` from `z.number().positive()` to `z.number().nonnegative()`
-- [ ] Propagate `missing: string[]` onto `Entry` in `src/lib/store.ts` (`toDraft`)
-- [ ] Guard `confirmEntry` in `src/app/page.tsx` when `items.some(it => it.quantity <= 0)`, `missing.length > 0`, empty items + null amount, or blank required `party` (with toast/edit guidance)
-- [ ] Replace static `SYSTEM_PROMPT` with dynamic `buildSystemPrompt(istTodayIso)` in `src/lib/schema.ts` and `src/app/api/parse/route.ts`
+- [x] Update `src/lib/schema.ts` `quantity` from `z.number().positive()` to `z.number().nonnegative()`
+- [x] Propagate `missing: string[]` onto `Entry` in `src/lib/store.ts` (`toDraft`)
+- [x] Guard `confirmEntry` in `src/app/page.tsx` when `items.some(it => it.quantity <= 0)`, `missing.length > 0`, empty items + null amount, or blank required `party` (with toast/edit guidance)
+- [x] Replace static `SYSTEM_PROMPT` with dynamic `buildSystemPrompt(istTodayIso)` in `src/lib/schema.ts` and `src/app/api/parse/route.ts`
 
 ### REC-04: Structured Clarification Merge & Mixed `order`+`udhaar` Card Display/Edit
-- [ ] Track `clarifyingEntryId` in `src/app/page.tsx` and highlight the card being clarified
-- [ ] Extend `POST /api/parse` (`route.ts`) to accept `{ utterance, existingEntry? }`
-- [ ] Implement structured field-aware clarification merging in `demo-parser.ts` (patch `missing` fields like `party`, `items`, `quantity`, `product` in place without spawning orphan cards) and in LLM prompt (`route.ts`)
-- [ ] Update `EntryCard.tsx` read view to display `amount` (`Purana udhaar / Raqam: ₹...`) on mixed `order`+`udhaar` cards even when `items.length > 0`
-- [ ] Update `EntryCard.tsx` edit view to allow editing `Raqam (₹)` on any entry, adding/removing items (`+ Add item` / `× Remove`), toggling `type` (`order` <-> `ledger`), and editing `dueDate`
-- [ ] Verify M1 via GitHub Actions CI (`typecheck`, `build`, `eval`, `docker-build`)
+- [x] Track `clarifyingEntryId` in `src/app/page.tsx` and highlight the card being clarified
+- [x] Extend `POST /api/parse` (`route.ts`) to accept `{ utterance, existingEntry? }`
+- [x] Implement structured field-aware clarification merging in `demo-parser.ts` (patch `missing` fields like `party`, `items`, `quantity`, `product` in place without spawning orphan cards) and in LLM prompt (`route.ts`)
+- [x] Update `EntryCard.tsx` read view to display `amount` (`Purana udhaar / Raqam: ₹...`) on mixed `order`+`udhaar` cards even when `items.length > 0`
+- [x] Update `EntryCard.tsx` edit view to allow editing `Raqam (₹)` on any entry, adding/removing items (`+ Add item` / `× Remove`), toggling `type` (`order` <-> `ledger`), and editing `dueDate`
+- [ ] Verify M1 via GitHub Actions CI (`typecheck`, `build`, `eval`, `docker-build`) + `scripts/test-p0.mjs`
 
 ---
 

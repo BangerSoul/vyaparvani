@@ -20,7 +20,13 @@ export default function Home() {
   const [hasServerKey, setHasServerKey] = useState(false);
   const [apiKey, setApiKey] = useState("");
   const [keyInput, setKeyInput] = useState("");
+  const [clarifyingEntryId, setClarifyingEntryId] = useState<string | null>(null);
   const textRef = useRef<HTMLInputElement>(null);
+
+  const clarifyingEntry = useMemo(
+    () => entries.find((e) => e.id === clarifyingEntryId) ?? null,
+    [entries, clarifyingEntryId],
+  );
 
   useEffect(() => {
     setMounted(true);
@@ -91,14 +97,31 @@ export default function Home() {
     if (!utterance) return;
     setStatus("parsing");
     setErrorMsg("");
+    const activeClarify = clarifyingEntry;
     try {
+      const payload = activeClarify
+        ? {
+            utterance,
+            existingEntry: {
+              type: activeClarify.type,
+              items: activeClarify.items,
+              party: activeClarify.party,
+              dueDate: activeClarify.dueDate,
+              amount: activeClarify.amount,
+              confidence: activeClarify.confidence,
+              missing: activeClarify.missing,
+              clarification: activeClarify.clarification,
+              source: activeClarify.source,
+            },
+          }
+        : { utterance };
       const res = await fetch("/api/parse", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           ...(apiKey ? { "x-openai-key": apiKey } : {}),
         },
-        body: JSON.stringify({ utterance }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -106,12 +129,48 @@ export default function Home() {
       }
       const parsed: { entries: ParsedEntry[]; mode?: "demo" | "model" } = await res.json();
       const mode = parsed.mode === "model" ? "model" : "demo";
+
+      if (activeClarify && parsed.entries.length > 0) {
+        const patched = parsed.entries[0];
+        setEntries((prev) =>
+          prev.map((e) =>
+            e.id === activeClarify.id
+              ? {
+                  ...e,
+                  type: patched.type,
+                  items: patched.items,
+                  party: patched.party,
+                  dueDate: patched.dueDate,
+                  amount: patched.amount,
+                  confidence: patched.confidence,
+                  missing: Array.isArray(patched.missing) ? patched.missing : [],
+                  clarification: patched.clarification,
+                  source: `${e.source} — ${utterance}`,
+                  mode,
+                  status: "draft",
+                }
+              : e,
+          ),
+        );
+        setClarifyingEntryId(null);
+        setTranscript("");
+        if (textRef.current) textRef.current.value = "";
+        setStatus("idle");
+        const stillUnsure = patched.confidence < 0.6 || (patched.missing?.length ?? 0) > 0;
+        setToast(
+          stillUnsure
+            ? "Entry update hui — ek aur sawaal baaki hai."
+            : "Entry clear ho gayi, confirm kijiye.",
+        );
+        return;
+      }
+
       const drafts = parsed.entries.map((e) => toDraft(e, utterance, mode));
       setEntries((prev) => [...drafts, ...prev]);
       setTranscript("");
       if (textRef.current) textRef.current.value = "";
       setStatus("idle");
-      const unsure = drafts.some((d) => d.confidence < 0.6);
+      const unsure = drafts.some((d) => d.confidence < 0.6 || d.missing.length > 0);
       setToast(unsure ? "Entry bani hai — ek sawaal poochhna hai." : "Entry ban gayi, confirm kijiye.");
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "Kuch galat ho gaya");
@@ -125,17 +184,42 @@ export default function Home() {
 
   function deleteEntry(id: string) {
     setEntries((prev) => prev.filter((e) => e.id !== id));
+    if (clarifyingEntryId === id) setClarifyingEntryId(null);
     setToast("Entry delete ho gayi.");
   }
 
   function confirmEntry(id: string) {
+    const entry = entries.find((e) => e.id === id);
+    if (!entry) return;
+    if (!entry.party.trim()) {
+      setToast("Party / dukaan ka naam zaroori hai — Edit ya Clarify kijiye.");
+      return;
+    }
+    if (entry.items.some((it) => !Number.isFinite(it.quantity) || it.quantity <= 0)) {
+      setToast("Har item ki matra 0 se zyada honi chahiye — Edit karke sahi matra daaliye.");
+      return;
+    }
+    if (entry.missing.length > 0) {
+      setToast("Entry adhuri hai — pehle Edit ya Clarify kijiye.");
+      return;
+    }
+    if (entry.items.length === 0 && (entry.amount === null || entry.amount <= 0)) {
+      setToast("Koi item ya raqam daaliye pehle.");
+      return;
+    }
     setEntries((prev) =>
-      prev.map((e) => (e.id === id ? { ...e, status: "confirmed", confidence: Math.max(e.confidence, 1) } : e)),
+      prev.map((e) =>
+        e.id === id
+          ? { ...e, status: "confirmed", confidence: Math.max(e.confidence, 1), missing: [] }
+          : e,
+      ),
     );
+    if (clarifyingEntryId === id) setClarifyingEntryId(null);
     setToast("Entry save ho gayi.");
   }
 
   function clarify(entry: Entry) {
+    setClarifyingEntryId(entry.id);
     setTranscript("");
     setStatus("idle");
     const el = textRef.current;
@@ -255,8 +339,29 @@ export default function Home() {
             parseAndAdd(readTyped());
           }}
         >
+          {clarifyingEntry && (
+            <div
+              role="status"
+              className="mb-3 flex items-center justify-between gap-2 rounded-card border border-saffron bg-[#FBF1E3] px-3 py-2 text-sm text-saffronDeep"
+            >
+              <span>
+                Clarifying draft:{" "}
+                <strong className="font-semibold">“{clarifyingEntry.source}”</strong>
+                {clarifyingEntry.clarification ? ` — ${clarifyingEntry.clarification}` : ""}
+              </span>
+              <button
+                type="button"
+                onClick={() => setClarifyingEntryId(null)}
+                className="shrink-0 rounded border border-saffron/40 bg-white px-2.5 py-1 text-xs font-semibold text-saffronDeep hover:bg-[#F6EBDD]"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
           <label htmlFor="typed" className="block text-sm font-medium text-inkSoft">
-            Ya type karke boliye (mic na chale to)
+            {clarifyingEntry
+              ? "Is entry ka jawaab boliye ya type kijiye"
+              : "Ya type karke boliye (mic na chale to)"}
           </label>
           <div className="mt-2 flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
             <input
@@ -324,6 +429,7 @@ export default function Home() {
               <EntryCard
                 key={entry.id}
                 entry={entry}
+                isClarifying={entry.id === clarifyingEntryId}
                 onUpdate={updateEntry}
                 onDelete={deleteEntry}
                 onConfirm={confirmEntry}

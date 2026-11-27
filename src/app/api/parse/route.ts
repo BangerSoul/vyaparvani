@@ -2,13 +2,29 @@ import { NextRequest, NextResponse } from "next/server";
 import { createOpenAI } from "@ai-sdk/openai";
 import { generateObject } from "ai";
 import { z } from "zod";
-import { parsedEntrySchema, parsedResponseSchema, SYSTEM_PROMPT } from "@/lib/schema";
-import { parseDemoUtterance } from "@/lib/demo-parser";
+import {
+  buildSystemPrompt,
+  getIstTodayIso,
+  parsedEntrySchema,
+  parsedResponseSchema,
+} from "@/lib/schema";
+import {
+  mergeDemoClarification,
+  parseDemoUtterance,
+  type ExistingDraftInput,
+} from "@/lib/demo-parser";
 
 export const runtime = "nodejs";
 
 const MODEL_TIMEOUT_MS = 15000;
 const KEY_HEADER = "x-openai-key";
+
+const existingEntrySchema = parsedEntrySchema
+  .partial()
+  .extend({
+    source: z.string().max(500).optional(),
+  })
+  .optional();
 
 // Lets the UI show the "API key not set" banner. Never returns the key itself.
 export async function GET() {
@@ -17,9 +33,20 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   let utterance = "";
+  let existingEntry: ExistingDraftInput | undefined;
   try {
     const body = await req.json();
     utterance = String(body?.utterance ?? "").slice(0, 500);
+    if (body?.existingEntry !== undefined && body?.existingEntry !== null) {
+      const parsedExisting = existingEntrySchema.safeParse(body.existingEntry);
+      if (!parsedExisting.success) {
+        return NextResponse.json(
+          { error: "Invalid existingEntry", detail: parsedExisting.error.message },
+          { status: 400 },
+        );
+      }
+      existingEntry = parsedExisting.data;
+    }
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
@@ -35,30 +62,52 @@ export async function POST(req: NextRequest) {
 
   if (!apiKey) {
     // Demo mode: local rule-based parser, clearly not the real model.
-    const entries = parseDemoUtterance(utterance);
-    console.log(JSON.stringify({
-      mode: "demo", model: "rule-based", latencyMs: Date.now() - started,
-      utteranceLength: utterance.length, entries: entries.length,
-    }));
-    return NextResponse.json({ entries, mode: "demo" });
+    try {
+      const entries = existingEntry
+        ? [mergeDemoClarification(utterance, existingEntry)]
+        : parseDemoUtterance(utterance);
+      console.log(JSON.stringify({
+        mode: "demo",
+        model: "rule-based",
+        clarify: Boolean(existingEntry),
+        latencyMs: Date.now() - started,
+        utteranceLength: utterance.length,
+        entries: entries.length,
+      }));
+      return NextResponse.json({ entries, mode: "demo" });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return NextResponse.json(
+        { error: "Demo parsing failed", detail: msg },
+        { status: 422 },
+      );
+    }
   }
 
   const openai = createOpenAI({ apiKey });
   const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
+  const systemPrompt = buildSystemPrompt(getIstTodayIso());
+  const prompt = existingEntry
+    ? `Existing draft entry JSON:\n${JSON.stringify(existingEntry)}\n\nUser clarification reply: "${utterance}"\nReturn a single merged entry in "entries" with missing fields patched in place.`
+    : utterance;
 
   try {
     const { object, usage } = await withTimeout(
       generateObject({
         model: openai(model),
         schema: parsedResponseSchema,
-        system: SYSTEM_PROMPT,
-        prompt: utterance,
+        system: systemPrompt,
+        prompt,
       }),
       MODEL_TIMEOUT_MS,
     );
     console.log(JSON.stringify({
-      mode: "model", model, latencyMs: Date.now() - started,
-      promptTokens: usage?.promptTokens, completionTokens: usage?.completionTokens,
+      mode: "model",
+      model,
+      clarify: Boolean(existingEntry),
+      latencyMs: Date.now() - started,
+      promptTokens: usage?.promptTokens,
+      completionTokens: usage?.completionTokens,
       entries: object.entries.length,
     }));
     return NextResponse.json({ entries: object.entries, mode: "model" });
@@ -71,12 +120,19 @@ export async function POST(req: NextRequest) {
           generateObject({
             model: openai(model),
             schema: parsedResponseSchema,
-            system: SYSTEM_PROMPT,
-            prompt: utterance,
+            system: systemPrompt,
+            prompt,
           }),
           MODEL_TIMEOUT_MS,
         );
-        console.log(JSON.stringify({ mode: "model", model: model + " (retry)", latencyMs: Date.now() - started, promptTokens: usage?.promptTokens, completionTokens: usage?.completionTokens, entries: object.entries.length }));
+        console.log(JSON.stringify({
+          mode: "model",
+          model: model + " (retry)",
+          latencyMs: Date.now() - started,
+          promptTokens: usage?.promptTokens,
+          completionTokens: usage?.completionTokens,
+          entries: object.entries.length,
+        }));
         return NextResponse.json({ entries: object.entries, mode: "model" });
       } catch (retryErr: unknown) {
         return NextResponse.json(

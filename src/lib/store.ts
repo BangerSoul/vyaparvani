@@ -10,6 +10,7 @@ export type Entry = {
   dueDate: string;
   amount: number | null;
   confidence: number;
+  missing: string[];
   clarification: string;
   source: string; // original utterance
   mode: "demo" | "model";
@@ -26,6 +27,7 @@ export function toDraft(parsed: ParsedEntry, source: string, mode: "demo" | "mod
     dueDate: parsed.dueDate,
     amount: parsed.amount,
     confidence: parsed.confidence,
+    missing: Array.isArray(parsed.missing) ? parsed.missing : [],
     clarification: parsed.clarification,
     source,
     mode,
@@ -47,7 +49,11 @@ export function loadEntries(): Entry[] {
     const raw = localStorage.getItem(KEY);
     if (!raw) return [];
     const list = JSON.parse(raw);
-    return Array.isArray(list) ? list : [];
+    if (!Array.isArray(list)) return [];
+    return list.map((e) => ({
+      ...e,
+      missing: Array.isArray(e?.missing) ? e.missing : [],
+    }));
   } catch {
     return [];
   }

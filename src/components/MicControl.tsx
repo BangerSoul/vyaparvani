@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { WebSpeechAdapter, type SpeechInputAdapter } from "@/lib/speech-adapter";
 
 type Props = {
   listening: boolean;
@@ -9,64 +10,69 @@ type Props = {
   onResult: (finalText: string, interimText: string) => void;
   onError: (message: string) => void;
   disabled?: boolean;
+  adapter?: SpeechInputAdapter;
 };
 
-export default function MicControl({ listening, onStart, onStop, onResult, onError, disabled }: Props) {
+export default function MicControl({
+  listening,
+  onStart,
+  onStop,
+  onResult,
+  onError,
+  disabled,
+  adapter,
+}: Props) {
   const [supported, setSupported] = useState(true);
-  const recRef = useRef<any>(null);
+  const adapterRef = useRef<SpeechInputAdapter | null>(null);
+  const finalTextRef = useRef("");
 
-  // Latest callbacks without re-creating the recognition object on re-render.
+  // Latest callbacks without re-creating the recognition adapter on re-render.
   const cbRef = useRef({ onResult, onStop, onError });
   cbRef.current = { onResult, onStop, onError };
 
   useEffect(() => {
-    const SR =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SR) {
-      setSupported(false);
-      return;
-    }
-    const rec = new SR();
-    rec.lang = "hi-IN"; // Hinglish: Hindi locale, English words pass through
-    rec.interimResults = true;
-    rec.continuous = true;
-    recRef.current = rec;
-    rec.onresult = (e: any) => {
-      let final = "";
-      let interim = "";
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        const t = e.results[i][0].transcript;
-        if (e.results[i].isFinal) final += t + " ";
-        else interim += t;
-      }
-      cbRef.current.onResult(final, interim);
-    };
-    rec.onend = () => cbRef.current.onStop();
-    rec.onerror = (e: any) => {
-      cbRef.current.onError(e?.error || "speech error");
-      cbRef.current.onStop();
-    };
+    const impl = adapter ?? new WebSpeechAdapter("hi-IN");
+    adapterRef.current = impl;
+    setSupported(impl.isSupported());
     return () => {
-      try { rec.stop(); } catch {}
+      impl.stop();
     };
-  }, []);
+  }, [adapter]);
 
   function start() {
-    const rec = recRef.current;
-    if (!rec) return;
-    try {
-      rec.start();
-      onStart();
-    } catch {
-      /* already started */
-    }
+    const impl = adapterRef.current;
+    if (!impl || !impl.isSupported()) return;
+    finalTextRef.current = "";
+    onStart();
+    impl.start({
+      onResult: (finalChunk, interim) => {
+        if (finalChunk) {
+          const clean = finalChunk.trim();
+          if (clean) {
+            finalTextRef.current = finalTextRef.current
+              ? `${finalTextRef.current.trimEnd()} ${clean} `
+              : `${clean} `;
+          }
+        }
+        cbRef.current.onResult(finalTextRef.current, interim);
+      },
+      onEnd: () => cbRef.current.onStop(),
+      onError: (msg) => {
+        cbRef.current.onError(msg);
+      },
+    });
+  }
+
+  function stop() {
+    adapterRef.current?.stop();
+    cbRef.current.onStop();
   }
 
   return (
     <div className="flex flex-col items-center gap-3">
       <button
         type="button"
-        onClick={listening ? onStop : start}
+        onClick={listening ? stop : start}
         disabled={disabled || !supported}
         aria-pressed={listening}
         aria-label={listening ? "Stop recording" : "Start recording"}
