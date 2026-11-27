@@ -25,8 +25,8 @@ try {
   const input = page.locator("#typed");
   const submitBtn = page.getByRole("button", { name: "Bhejiye" });
 
-  // 1. Create a confirmed mixed order + udhaar entry
-  await input.fill("Gupta store ko 5 kg chawal bhej do aur unka 200 udhaar tha");
+  // 1. Create a confirmed mixed order + udhaar entry (also triggers Low stock: surf pulse)
+  await input.fill("3 packet surf Gupta store ko bhej do aur unka 200 udhaar tha");
   await submitBtn.click();
 
   const guptaCard = page.locator("article", { hasText: "Gupta Store" }).first();

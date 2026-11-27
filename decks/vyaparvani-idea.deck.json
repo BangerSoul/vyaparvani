@@ -55,16 +55,16 @@
     {
       "layout": "split",
       "title": "Speak Hinglish, get a confirmed entry",
-      "body": "VyaparVani turns a spoken line — \"5 kg chawal Gupta store ko bhej do\" — into a structured, editable order or udhaar entry. The prototype already does this end to end: voice capture, model parsing with a trade glossary, editable cards, confirm-to-save, and clarifying questions when the speech is incomplete.",
+      "body": "VyaparVani turns a spoken line — \"3 packet surf Gupta store ko bhej do aur unka 200 udhaar tha\" — into a confirmed order, Khata balance, and stock update. Shipped end to end: Web Speech + Whisper ASR + Wispr Flow Dictation Mode, inline clarification patching, and 1-tap WhatsApp slips.",
       "bullets": [
-        "One dominant mic control with live transcript",
-        "Order and udhaar cards: edit, delete, confirm",
-        "Asks back instead of guessing on low confidence",
-        "Works without any API key in demo mode"
+        "Mic, Whisper ASR, Wispr Flow & Hands-free TTS",
+        "Signed Khata (Parties) + Stock Pulse low-stock alerts",
+        "In-place Clarify patch + live No-edit accuracy KPI",
+        "1-tap WhatsApp slips, CSV export & no-key Demo mode"
       ],
       "image": "decks/assets/ui-screenshot.png",
-      "imageCaption": "Counter Desk UI — Demo mode (no API key required)",
-      "notes": "Walk the audience through the shipped UI: large mic, transcript, card with three always-visible actions, Hinglish copy everywhere."
+      "imageCaption": "Counter Desk UI — Demo mode (sample chips, Stock Pulse, Khata & WhatsApp)",
+      "notes": "Walk the audience through the shipped UI: mic + Wispr Flow Dictation Mode + Hands-free toggle, 4 sample chips, Stock Pulse low-stock reorder alert, No-edit accuracy KPI pill, Khata (Parties) tab, Distributor CSV buttons, and WhatsApp pe bhejein."
     },
     {
       "layout": "diagram",
@@ -72,10 +72,10 @@
       "diagram": {
         "kind": "flow",
         "nodes": [
-          { "id": "speak", "label": "Boliye", "body": "Mic or type the line", "icon": "phone" },
-          { "id": "parse", "label": "Parse", "body": "zod schema + trade glossary", "icon": "cpu" },
-          { "id": "review", "label": "Review", "body": "Edit, or answer a clarifying question", "icon": "eye" },
-          { "id": "save", "label": "Confirm", "body": "Saved, survives reload", "icon": "check" }
+          { "id": "speak", "label": "Boliye", "body": "Mic, Whisper, or Wispr Flow", "icon": "phone" },
+          { "id": "parse", "label": "Parse", "body": "zod + glossary + Devanagari", "icon": "cpu" },
+          { "id": "review", "label": "Review", "body": "In-place clarify or TTS confirm", "icon": "eye" },
+          { "id": "save", "label": "Confirm", "body": "Khata, stock, WhatsApp & CSV", "icon": "check" }
         ],
         "edges": [
           { "from": "speak", "to": "parse" },
@@ -84,7 +84,7 @@
         ],
         "highlight": "parse"
       },
-      "notes": "This diagram matches the shipped code exactly: Web Speech capture in the browser, /api/parse calling the model with a zod structured-output schema and trade glossary, cards with confirm/edit/delete, and localStorage persistence after confirm."
+      "notes": "This diagram matches the shipped M3/M4 pipeline: Web Speech, /api/transcribe Whisper fallback, or Wispr Flow Dictation Mode -> /api/parse with zod schema, trade glossary, and Devanagari normalization -> in-place Clarify merge or Hands-free hi-IN TTS readback -> Confirm updates Khata balances, deducts local stock, and enables 1-tap WhatsApp slips & Distributor CSV."
     },
     {
       "layout": "chart",
@@ -110,13 +110,13 @@
       "layout": "features",
       "title": "What the prototype already does",
       "items": [
-        { "icon": "phone", "title": "Voice and typed capture", "body": "Web Speech API mic, typed fallback." },
-        { "icon": "cpu", "title": "Structured parsing", "body": "AI SDK + zod, trade glossary, one retry on 429." },
-        { "icon": "message", "title": "Clarification, not guessing", "body": "Low confidence gets a Hinglish question." },
-        { "icon": "shield", "title": "Runs anywhere", "body": "docker compose up; demo mode needs no key." },
-        { "icon": "gauge", "title": "Regression eval", "body": "60-utterance golden set on every run." }
+        { "icon": "phone", "title": "Voice, Whisper & Wispr Flow", "body": "Web Speech, /api/transcribe (whisper-1), Wispr Dictation & Hands-free TTS." },
+        { "icon": "cpu", "title": "Structured & resilient parsing", "body": "AI SDK + zod, glossary, 15s timeout & 2x 429 exponential backoff." },
+        { "icon": "message", "title": "In-place clarify & guards", "body": "Structured draft patching on low confidence + confirm safety guards." },
+        { "icon": "shield", "title": "Khata, stock & WhatsApp", "body": "Party net balances, local Stock Pulse, WhatsApp slips & CSV export." },
+        { "icon": "gauge", "title": "60-case eval & CI gates", "body": "60/60 Demo eval, Playwright P0/M3/P3/finale E2E & Docker standalone." }
       ],
-      "notes": "Deck-code match check: every item maps to a shipped file — MicControl (Web Speech), api/parse (AI SDK, zod, glossary, timeout, retry), clarification prompts, Dockerfile + compose, eval/golden.json + scripts/eval-parser.mjs. Edit, delete and confirm sit on every entry card."
+      "notes": "Deck-code match check: every item maps to shipped files — MicControl + speech-adapter + api/transcribe, api/parse (AI SDK, zod, glossary, 15s AbortController, 2x 429 backoff), mergeDemoClarification + confirmEntry guards, store.ts + inventory.ts + share.ts, eval/golden.json + scripts/test-finale-e2e.mjs."
     },
     {
       "layout": "table",
@@ -124,21 +124,21 @@
       "table": {
         "columns": ["Layer", "Today & Est. Cost", "429 / Outage Fallback", "Swap Path"],
         "rows": [
-          ["Voice capture", "Web Speech API (₹0 browser)", "Typed Hinglish input today; Wispr Dictation Mode & Whisper fallback (M3)", "Whisper / on-device ASR"],
-          ["NL parsing", "gpt-4o-mini (~₹0.01/entry)", "15s timeout + 1x 429 retry (backoff in M4); returns 429/502 error on fail; clear/no key runs ₹0 demo parser", "Any AI SDK provider / BYOK, same zod contract"],
+          ["Voice capture", "Web Speech (₹0) + Wispr Dictation", "Typed Hinglish & Wispr Flow Dictation Mode offline; Whisper (/api/transcribe) when key set", "SpeechInputAdapter (WebSpeech / Whisper)"],
+          ["NL parsing", "gpt-4o-mini (~₹0.01/entry)", "15s AbortController (25s budget) + 2x 429 backoff (600ms/1200ms); 401/429/504 errors; no-key runs ₹0 demo parser", "Any AI SDK provider / BYOK, same zod contract"],
           ["No-key fallback", "Deterministic rule parser (₹0)", "Runs 100% locally with zero API calls, rate limits, or cost", "Local SLM / WebLLM"],
-          ["Storage", "Browser localStorage (₹0)", "Works offline across reloads; zero server DB dependency", "Synced Postgres (StorageAdapter in M4)"]
+          ["Storage", "Browser localStorage (₹0)", "Try/catch persistence across reloads + JSON backup export/import; zero DB dependency", "Synced Postgres (StorageAdapter shipped)"]
         ]
       },
-      "callout": "If OpenAI, ASR, or network gets costly or stops working: BYOK keeps server LLM cost at ₹0; 15s timeout + 1x 429 retry guards live calls (backoff in M4); clearing or omitting the key switches to the ₹0 rule-based demo parser + typed Hinglish input (Wispr Dictation Mode in M3) + offline localStorage.",
-      "notes": "Nothing is welded to one vendor. The zod structured-output contract means a model swap is a one-line change; M3 adds Whisper ASR + Wispr Flow Dictation Mode; BYOK keeps server cost ₹0; and without a key the deterministic demo parser keeps working offline."
+      "callout": "If OpenAI, ASR, or network gets costly or stops working: BYOK keeps server LLM cost at ₹0; 15s AbortController + up to 2x 429 exponential backoff guards live calls; clearing or omitting the key switches to the ₹0 local demo parser + Wispr Flow Dictation Mode + offline localStorage with JSON backup.",
+      "notes": "Nothing is welded to one vendor. The zod structured-output contract means a model swap is a one-line change; SpeechInputAdapter covers Web Speech + /api/transcribe Whisper + Wispr Flow Dictation Mode; StorageAdapter + JSON export/import are shipped; BYOK keeps server cost ₹0; and without a key the deterministic demo parser keeps working offline."
     },
     {
       "layout": "metric",
       "kicker": "Why this wins",
       "title": "Zero typing beats zero features",
       "stats": [
-        { "value": "0", "label": "keystrokes for a confirmed order" },
+        { "value": "0", "label": "keystrokes typed for a confirmed order" },
         { "value": "1", "label": "sentence per entry, in the seller's own words" },
         { "value": "100%", "label": "of golden utterances parsed exactly (demo mode)" }
       ],
@@ -146,13 +146,13 @@
       "sources": [
         { "title": "VyaparVani eval run, demo mode, 2026-11-27 (npm run eval)", "url": "https://github.com/BangerSoul/vyaparvani" }
       ],
-      "notes": "Early success measure we committed to in the README: share of entries accepted without edits. No impact numbers are claimed until measured."
+      "notes": "Live No-edit accuracy KPI pill (edited?: boolean) is shipped in the Counter Desk UI to measure entries accepted without manual edits."
     },
     {
       "layout": "timeline",
       "title": "Go-to-market: through the distributor, not the app store",
       "items": [
-        { "tag": "Now", "title": "Prototype on Docker Compose", "body": "Public repo, eval set, demo mode — this submission." },
+        { "tag": "Now", "title": "Prototype on Docker Compose", "body": "Public repo, 60-case eval, Khata/stock/WhatsApp loop, No-edit KPI & standalone Docker." },
         { "tag": "Phase 2", "title": "10 friendly kiranas + 1 FMCG distributor", "body": "Pilot with real stock lines; measure entries accepted without edit." },
         { "tag": "Phase 3", "title": "Distributor-led distribution", "body": "Salesmen already visit weekly — they carry the app to the shop." },
         { "tag": "Phase 4", "title": "Monetize the order flow", "body": "Free for entries; charge distributors for digitized orders and insights." }
@@ -167,7 +167,7 @@
     {
       "layout": "closing",
       "title": "Bolo, samajh gaya, likh diya.",
-      "subtitle": "VyaparVani — Hinglish voice & typed workflow today (Web Speech API + typed Hinglish; Wispr Flow Dictation Mode & Whisper fallback in M3). docker compose up, and the counter is open.",
+      "subtitle": "VyaparVani — Hinglish voice, Wispr Flow Dictation Mode, Whisper ASR fallback, Khata net balances, local stock pulse, and 1-tap WhatsApp slips. docker compose up, and the counter is open.",
       "command": "docker compose up",
       "notes": "Close on the demo: the prototype is real, running, and measured. Ask for the pass to the finale."
     }

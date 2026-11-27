@@ -67,6 +67,7 @@ jobs:
           node scripts/capture-ui.mjs http://127.0.0.1:3000 decks/assets/ui-screenshot.png
           node scripts/test-m3.mjs http://127.0.0.1:3000
           node scripts/test-p3.mjs http://127.0.0.1:3000
+          node scripts/test-finale-e2e.mjs http://127.0.0.1:3000
 
       - name: Upload UI screenshot artifact
         uses: actions/upload-artifact@v4
