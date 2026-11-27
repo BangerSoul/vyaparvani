@@ -45,7 +45,7 @@ try {
   assert.equal(await page.locator("article").count(), 1);
   await guptaCard.getByText("Order", { exact: true }).waitFor({ timeout: 5000 });
   await guptaCard.getByText("Udhaar diya (+₹)", { exact: true }).waitFor({ timeout: 5000 });
-  await guptaCard.getByText("3 packet surf", { exact: false }).waitFor({ timeout: 5000 });
+  await guptaCard.getByText("3 packet surf", { exact: true }).waitFor({ timeout: 5000 });
   await guptaCard.getByText("Raqam / Udhaar: ₹200", { exact: true }).waitFor({ timeout: 5000 });
 
   await guptaCard.getByRole("button", { name: "Confirm & save" }).click();
@@ -78,7 +78,8 @@ try {
   const vermaCard = page.locator("article", { hasText: "Verma Store" }).first();
   await vermaCard.waitFor({ timeout: 10000 });
   assert.equal(await page.locator("article").count(), 2);
-  await vermaCard.getByText("5 kg chawal (rice)", { exact: false }).waitFor({ timeout: 5000 });
+  await vermaCard.getByText("Verma Store", { exact: true }).waitFor({ timeout: 5000 });
+  await vermaCard.getByText("5 kg chawal (rice)", { exact: true }).waitFor({ timeout: 5000 });
   assert.equal(await clarifyStatus.count(), 0);
 
   await vermaCard.getByRole("button", { name: "Confirm & save" }).click();
