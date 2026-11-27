@@ -57,6 +57,8 @@
         "Asks back instead of guessing on low confidence",
         "Works without any API key in demo mode"
       ],
+      "image": "decks/assets/ui-screenshot.png",
+      "imageCaption": "Counter Desk UI — Demo mode (no API key required)",
       "notes": "Walk the audience through the shipped UI: large mic, transcript, card with three always-visible actions, Hinglish copy everywhere."
     },
     {
@@ -82,13 +84,17 @@
     {
       "layout": "chart",
       "title": "The parser is measured, not promised",
-      "body": "26 golden Hinglish utterances — 21 order, 4 udhaar, 1 mixed order+udhaar — including noise cases (missing quantity, missing product). 26/26 exact match, run on every check. [1]",
+      "body": "26 golden Hinglish utterances (21 order, 4 udhaar, 1 mixed) — 100% exact match across all categories in Demo Regex Eval (median 9 ms, CI-verified). Live gpt-4o-mini path is wired via zod + glossary and awaiting OPENAI_API_KEY benchmark. [1]",
       "chart": {
         "type": "bar",
-        "labels": ["Order utterances", "Ledger (udhaar)", "Mixed order + udhaar"],
-        "series": [{ "name": "Exact match", "values": [21, 4, 1] }],
-        "unit": "of 26 cases",
-        "highlight": 2
+        "labels": ["Order (n=21)", "Ledger / udhaar (n=4)", "Mixed order+udhaar (n=1)"],
+        "series": [{ "name": "Demo Regex Eval", "values": [100, 100, 100] }],
+        "unit": "% exact-match",
+        "highlight": 2,
+        "comparison": {
+          "demo": "26/26 (100%), median 9 ms — npm run eval (CI-verified)",
+          "live": "gpt-4o-mini + zod + glossary wired; benchmark pending OPENAI_API_KEY"
+        }
       },
       "sources": [
         { "title": "VyaparVani eval run, demo mode, 2026-11-27 (npm run eval)", "url": "https://github.com/BangerSoul/vyaparvani" }
@@ -109,17 +115,18 @@
     },
     {
       "layout": "table",
-      "title": "Downstream dependencies: all swappable",
+      "title": "Downstream dependencies: cost, limits & outage fallback",
       "table": {
-        "columns": ["Layer", "Today", "Swap path"],
+        "columns": ["Layer", "Today & Est. Cost", "429 / Outage Fallback", "Swap Path"],
         "rows": [
-          ["Capture", "Web Speech API", "Whisper / on-device ASR"],
-          ["Model", "gpt-4o-mini via AI SDK", "Any provider, same zod contract"],
-          ["No-key fallback", "Rule-based parser", "Offline mode"],
-          ["Storage", "localStorage", "Synced Postgres"]
+          ["Voice capture", "Web Speech API (₹0 browser)", "Typed Hinglish / Wispr dictation; Whisper fallback (M3)", "Whisper / on-device ASR"],
+          ["NL parsing", "gpt-4o-mini (~₹0.01/entry)", "15s timeout + 429 retry/backoff; auto-falls back to ₹0 demo parser", "Any AI SDK provider / BYOK, same zod contract"],
+          ["No-key fallback", "Deterministic rule parser (₹0)", "Runs 100% locally with zero API calls, rate limits, or cost", "Local SLM / WebLLM"],
+          ["Storage", "Browser localStorage (₹0)", "Works offline across reloads; zero server DB dependency", "Synced Postgres (StorageAdapter)"]
         ]
       },
-      "notes": "Nothing is welded to one vendor. The zod structured-output contract means a model swap is a one-line change; capture moves to a dedicated ASR provider; regional languages reuse the glossary pattern (verified path today: Hinglish)."
+      "callout": "If OpenAI, ASR, or network gets costly or stops working: BYOK keeps server LLM cost at ₹0; 15s timeout + 429 retry/backoff guards live calls; ₹0 rule-based demo parser + typed/Wispr input + localStorage keep the counter running offline.",
+      "notes": "Nothing is welded to one vendor. The zod structured-output contract means a model swap is a one-line change; capture moves to a dedicated ASR provider; BYOK keeps server cost ₹0; and the deterministic demo parser keeps working offline."
     },
     {
       "layout": "metric",
@@ -155,7 +162,7 @@
     {
       "layout": "closing",
       "title": "Bolo, samajh gaya, likh diya.",
-      "subtitle": "VyaparVani — built with Wispr Flow. docker compose up, and the counter is open.",
+      "subtitle": "VyaparVani — Hinglish voice & dictation workflow (Web Speech API + Wispr Flow Dictation Mode / Whisper fallback). docker compose up, and the counter is open.",
       "notes": "Close on the demo: the prototype is real, running, and measured. Ask for the pass to the finale."
     }
   ]

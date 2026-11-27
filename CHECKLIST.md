@@ -1,8 +1,8 @@
 # VyaparVani — Resumable P0–P3 Implementation Checklist
 
-- **Last Updated**: 2026-11-27T11:16:00Z
-- **Current Milestone**: M1 Complete -> Ready for M2 (`REC-05` & Round 2 Req 3.3 Deck Pipeline Rebuild)
-- **Next Resumable Step**: M2 — Capture real UI screenshot (`decks/assets/ui-screenshot.png`) & rebuild `vyaparvani-idea.pdf` via `scripts/build-deck.py`
+- **Last Updated**: 2026-11-27T11:44:00Z
+- **Current Milestone**: M2 Complete -> Ready for M3 (`REC-06`–`REC-10` P1 Differentiation & Core Product Loops)
+- **Next Resumable Step**: M3 — Implement `REC-06` (Wispr Flow Dictation Mode + `/api/transcribe` Whisper fallback), `REC-07` (`ledgerAction` + `Khata (Parties)`), `REC-08` (WhatsApp + CSV), `REC-09` (stock), `REC-10` (Hands-free + TTS)
 - **Repository Branch**: `feat/round2-submission` (branched from `master` @ `42448d4`)
 
 ---
@@ -56,14 +56,14 @@
 ---
 
 ## M2 — `vyaparvani-idea` Deck Pipeline Rebuild (`REC-05` & Round 2 Req 3.3)
-- [ ] Capture genuine rendered Counter Desk UI screenshot (`decks/assets/ui-screenshot.png`) via Playwright/Chromium in CI (or verified build pipeline) running the live app in Demo mode
-- [ ] Create deterministic native-text PDF build script `scripts/build-deck.py` (`reportlab` + `PIL`, 16:9 `960x540` pt, embedded TrueType fonts) driven by `decks/vyaparvani-idea.deck.json`
-- [ ] Fix Slide 3: render `decks/vyaparvani-idea.deck.json` `body` narrative cleanly
-- [ ] Fix Slide 4 (`REC-05`): replace diagonal-striped placeholder with the real UI screenshot (`decks/assets/ui-screenshot.png`)
-- [ ] Fix Slide 6 (`REC-05`): show accuracy % across categories with explicit sample sizes (`n=21`, `n=4`, `n=1`) and clearly distinguish Demo Regex Eval vs. Live `gpt-4o-mini` LLM Eval
-- [ ] Fix Slide 8 (Round 2 Req 3.3): add dependency cost estimates, rate-limit handling (`429` backoff), and outage fallback details to the architecture/dependency table
-- [ ] Fix Slide 12 (`REC-05`): align `"Wispr Flow"` claim with actual shipped Wispr Flow Dictation Mode + Web Speech / Whisper fallback
-- [ ] Generate `/home/bangersoul/Projects/vyaparvani/vyaparvani-idea.pdf` and verify `<= 10 MB`, 12 slides, non-empty `pdftotext` output on every slide (1–12), and visual inspection via `pdftoppm`
+- [x] Capture genuine rendered Counter Desk UI screenshot (`decks/assets/ui-screenshot.png`) via Playwright/Chromium in CI (or verified build pipeline) running the live app in Demo mode
+- [x] Create deterministic native-text PDF build script `scripts/build-deck.py` (`reportlab` + `PIL`, 16:9 `960x540` pt, embedded TrueType fonts) driven by `decks/vyaparvani-idea.deck.json`
+- [x] Fix Slide 3: render `decks/vyaparvani-idea.deck.json` `body` narrative cleanly
+- [x] Fix Slide 4 (`REC-05`): replace diagonal-striped placeholder with the real UI screenshot (`decks/assets/ui-screenshot.png`)
+- [x] Fix Slide 6 (`REC-05`): show accuracy % across categories with explicit sample sizes (`n=21`, `n=4`, `n=1`) and clearly distinguish Demo Regex Eval vs. Live `gpt-4o-mini` LLM Eval
+- [x] Fix Slide 8 (Round 2 Req 3.3): add dependency cost estimates, rate-limit handling (`429` backoff), and outage fallback details to the architecture/dependency table
+- [x] Fix Slide 12 (`REC-05`): align `"Wispr Flow"` claim with actual shipped Wispr Flow Dictation Mode + Web Speech / Whisper fallback
+- [x] Generate `/home/bangersoul/Projects/vyaparvani/vyaparvani-idea.pdf` and verify `<= 10 MB`, 12 slides, non-empty `pdftotext` output on every slide (1–12), and visual inspection via `pdftoppm`
 
 ---
 
