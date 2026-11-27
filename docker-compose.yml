@@ -1,0 +1,10 @@
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - OPENAI_API_KEY
+      - OPENAI_MODEL
+    # Pass the key at runtime, not in the image:
+    #   OPENAI_API_KEY=sk-... docker compose up
