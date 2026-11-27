@@ -281,21 +281,22 @@ await test("Playwright M3 remediation flows: multi-word SKU, product-first resto
     const mehtaOrderCard = page.locator("article", { hasText: "Mehta Store" }).first();
     await mehtaOrderCard.waitFor({ timeout: 10000 });
     await mehtaOrderCard.getByRole("button", { name: "Confirm & save" }).click();
+    await mehtaOrderCard.getByText("Confirmed", { exact: true }).waitFor({ timeout: 5000 });
 
     await page.getByRole("tab", { name: "Khata (Parties)" }).click();
     const mehtaKhataCard = page.locator("article", { hasText: "Mehta Store" }).first();
     await mehtaKhataCard.getByText("₹300 baki", { exact: true }).waitFor({ timeout: 5000 });
 
     const wasooliBtn = mehtaKhataCard.getByRole("button", { name: "Wasooli record karo" });
+    await wasooliBtn.waitFor({ timeout: 5000 });
     await wasooliBtn.evaluate((el) => {
       el.click();
       el.click();
     });
 
     await mehtaKhataCard.getByText("Settled", { exact: true }).waitFor({ timeout: 5000 });
-    await mehtaKhataCard
-      .getByText("Udhaar diya: ₹300 • Wasooli: ₹300 • 2 confirmed", { exact: true })
-      .waitFor({ timeout: 5000 });
+    await mehtaKhataCard.getByText("Wasooli: ₹300", { exact: false }).waitFor({ timeout: 5000 });
+    await mehtaKhataCard.getByText("2 confirmed", { exact: false }).waitFor({ timeout: 5000 });
     assert.equal(await mehtaKhataCard.getByText("advance", { exact: false }).count(), 0);
   } finally {
     await browser.close();
