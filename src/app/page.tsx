@@ -11,6 +11,10 @@ import {
   toDraft,
   type Entry,
 } from "@/lib/store";
+import {
+  buildDistributorCsv,
+  buildKhataWhatsAppUrl,
+} from "@/lib/share";
 import type { ParsedEntry } from "@/lib/schema";
 import {
   WebSpeechAdapter,
@@ -153,6 +157,34 @@ export default function Home() {
   }, [toast]);
 
   const partyBalances = useMemo(() => computePartyBalances(entries), [entries]);
+
+  const confirmedOrderItemsCount = useMemo(
+    () =>
+      entries.filter(
+        (e) => e.status === "confirmed" && e.type === "order" && e.items.length > 0,
+      ).length,
+    [entries],
+  );
+
+  function downloadDistributorCsv() {
+    const csv = buildDistributorCsv(entries);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "vyaparvani-distributor-orders.csv";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setToast("Distributor Order Sheet CSV download ho gaya.");
+  }
+
+  function copyDistributorCsv() {
+    const csv = buildDistributorCsv(entries);
+    navigator.clipboard?.writeText(csv);
+    setToast("Distributor Order Sheet CSV copied.");
+  }
 
   const filtered = useMemo(
     () =>
@@ -609,6 +641,25 @@ export default function Home() {
           </div>
         </div>
 
+        {confirmedOrderItemsCount > 0 && (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={downloadDistributorCsv}
+              className="rounded-card border border-line bg-card px-3 py-1.5 text-xs font-semibold text-ink hover:bg-[#F3EDE0]"
+            >
+              Distributor Order Sheet (CSV)
+            </button>
+            <button
+              type="button"
+              onClick={copyDistributorCsv}
+              className="rounded-card border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-inkSoft hover:bg-[#F3EDE0]"
+            >
+              Copy CSV
+            </button>
+          </div>
+        )}
+
         {selectedPartyKey && filter !== "khata" && (
           <div className="mt-3 flex items-center gap-2">
             <span className="inline-flex items-center gap-2 rounded-full border border-saffron bg-[#FBF1E3] px-3 py-1 text-xs font-semibold text-saffronDeep">
@@ -696,6 +747,14 @@ export default function Home() {
                         Wasooli record karo
                       </button>
                     )}
+                    <a
+                      href={buildKhataWhatsAppUrl(summary)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="rounded-card border border-[#2E6B2E]/30 bg-[#E5F0E4] px-3 py-1.5 text-xs font-semibold text-[#2E6B2E] hover:opacity-90"
+                    >
+                      WhatsApp pe bhejein
+                    </a>
                   </div>
                 </article>
               ))}

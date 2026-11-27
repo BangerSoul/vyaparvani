@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { Entry } from "@/lib/store";
 import type { EntryItem, LedgerAction } from "@/lib/schema";
+import { buildEntryWhatsAppUrl } from "@/lib/share";
 
 type Props = {
   entry: Entry;
@@ -459,6 +460,16 @@ export default function EntryCard({
         >
           Delete
         </button>
+        {entry.status === "confirmed" && !editing && (
+          <a
+            href={buildEntryWhatsAppUrl(entry)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-card border border-[#2E6B2E]/30 bg-[#E5F0E4] px-4 py-2 text-sm font-semibold text-[#2E6B2E] hover:opacity-90"
+          >
+            WhatsApp pe bhejein
+          </a>
+        )}
         <button
           type="button"
           onClick={() => onConfirm(entry.id)}

@@ -1,8 +1,8 @@
 # VyaparVani — Resumable P0–P3 Implementation Checklist
 
-- **Last Updated**: 2026-11-27T16:12:00Z
-- **Current Milestone**: M3 IN PROGRESS — `REC-06`, `REC-07` complete, proceeding to `REC-08`
-- **Next Resumable Step**: M3 — Implement `REC-08` (WhatsApp + CSV), `REC-09` (stock), `REC-10` (Hands-free + TTS)
+- **Last Updated**: 2026-11-27T16:17:00Z
+- **Current Milestone**: M3 IN PROGRESS — `REC-06`–`REC-08` complete, proceeding to `REC-09`
+- **Next Resumable Step**: M3 — Implement `REC-09` (stock), `REC-10` (Hands-free + TTS + M3 CI smoke)
 - **Repository Branch**: `feat/round2-submission` (branched from `master` @ `42448d4`)
 
 ---
@@ -81,8 +81,8 @@
 - [x] Add 4th tab `Khata (Parties)` in `src/app/page.tsx` displaying per-party net balances, settled status, filter by party, and 1-click `"Wasooli record karo"`
 
 ### REC-08: 1-Tap WhatsApp `wa.me` Slips & Distributor CSV Export
-- [ ] Add 1-tap `WhatsApp pe bhejein` (`https://wa.me/?text=...`) order/udhaar slip button on confirmed `EntryCard`s and `Khata (Parties)` rows
-- [ ] Add `Distributor Order Sheet (CSV)` export/copy action in `src/app/page.tsx` aggregating confirmed orders
+- [x] Add 1-tap `WhatsApp pe bhejein` (`https://wa.me/?text=...`) order/udhaar slip button on confirmed `EntryCard`s and `Khata (Parties)` rows
+- [x] Add `Distributor Order Sheet (CSV)` export/copy action in `src/app/page.tsx` aggregating confirmed orders
 
 ### REC-09: Lightweight Voice-Driven Stock Deduction & Low-Stock Alerts
 - [ ] Create `src/lib/inventory.ts` with `localStorage`-persisted common kirana SKUs, order confirmation stock deduction, voice restock parsing/handling, and low-stock threshold alerts
