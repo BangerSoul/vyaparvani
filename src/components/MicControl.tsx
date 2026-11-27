@@ -8,6 +8,7 @@ type Props = {
   onStart: () => void;
   onStop: () => void;
   onResult: (finalText: string, interimText: string) => void;
+  onSessionEnd?: (finalTranscript: string) => void;
   onError: (message: string) => void;
   disabled?: boolean;
   adapter?: SpeechInputAdapter;
@@ -18,6 +19,7 @@ export default function MicControl({
   onStart,
   onStop,
   onResult,
+  onSessionEnd,
   onError,
   disabled,
   adapter,
@@ -25,16 +27,19 @@ export default function MicControl({
   const [supported, setSupported] = useState(true);
   const adapterRef = useRef<SpeechInputAdapter | null>(null);
   const finalTextRef = useRef("");
+  const latestInterimRef = useRef("");
+  const sessionActiveRef = useRef(false);
 
   // Latest callbacks without re-creating the recognition adapter on re-render.
-  const cbRef = useRef({ onResult, onStop, onError });
-  cbRef.current = { onResult, onStop, onError };
+  const cbRef = useRef({ onResult, onStop, onSessionEnd, onError });
+  cbRef.current = { onResult, onStop, onSessionEnd, onError };
 
   useEffect(() => {
     const impl = adapter ?? new WebSpeechAdapter("hi-IN");
     adapterRef.current = impl;
     setSupported(impl.isSupported());
     return () => {
+      sessionActiveRef.current = false;
       impl.stop();
     };
   }, [adapter]);
@@ -43,6 +48,8 @@ export default function MicControl({
     const impl = adapterRef.current;
     if (!impl || !impl.isSupported()) return;
     finalTextRef.current = "";
+    latestInterimRef.current = "";
+    sessionActiveRef.current = true;
     onStart();
     impl.start({
       onResult: (finalChunk, interim) => {
@@ -54,9 +61,18 @@ export default function MicControl({
               : `${clean} `;
           }
         }
+        latestInterimRef.current = interim || "";
         cbRef.current.onResult(finalTextRef.current, interim);
       },
-      onEnd: () => cbRef.current.onStop(),
+      onEnd: () => {
+        if (!sessionActiveRef.current) return;
+        sessionActiveRef.current = false;
+        const combined = `${finalTextRef.current} ${latestInterimRef.current}`
+          .replace(/\s+/g, " ")
+          .trim();
+        cbRef.current.onStop();
+        cbRef.current.onSessionEnd?.(combined);
+      },
       onError: (msg) => {
         cbRef.current.onError(msg);
       },

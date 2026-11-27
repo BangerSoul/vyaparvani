@@ -73,10 +73,14 @@ export default function Home() {
   const [keyInput, setKeyInput] = useState("");
   const [clarifyingEntryId, setClarifyingEntryId] = useState<string | null>(null);
   const [wisprMode, setWisprMode] = useState(false);
+  const [handsFree, setHandsFree] = useState(false);
   const [showDictionary, setShowDictionary] = useState(false);
   const [useWhisperFallback, setUseWhisperFallback] = useState(false);
   const textRef = useRef<HTMLInputElement>(null);
   const wisprTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const parsingLockRef = useRef(false);
+  const handsFreeRef = useRef(handsFree);
+  handsFreeRef.current = handsFree;
   const apiKeyRef = useRef(apiKey);
   apiKeyRef.current = apiKey;
 
@@ -223,10 +227,47 @@ export default function Home() {
 
   const readTyped = () => (textRef.current?.value || "").trim();
 
+  function speakHinglishSummary(text: string) {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    try {
+      window.speechSynthesis.cancel();
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.lang = "hi-IN";
+      utter.rate = 1;
+      window.speechSynthesis.speak(utter);
+    } catch {
+      // ignore speechSynthesis failures in headless/restricted browsers
+    }
+  }
+
+  function summarizeEntryForSpeech(entry: ParsedEntry): string {
+    if (entry.confidence < 0.6 || (entry.missing?.length ?? 0) > 0) {
+      return entry.clarification || "Kripya entry check kijiye.";
+    }
+    const party = entry.party.trim() || "Customer";
+    const parts: string[] = [];
+    if (entry.items.length > 0) {
+      parts.push(
+        entry.items
+          .map((it) => [it.quantity, it.unit, it.product].filter(Boolean).join(" "))
+          .join(", "),
+      );
+    }
+    if (entry.amount !== null && entry.amount > 0) {
+      parts.push(
+        entry.ledgerAction === "payment_received"
+          ? `${entry.amount} rupaye wasooli`
+          : `${entry.amount} rupaye udhaar`,
+      );
+    }
+    return `${party}, ${parts.join(" aur ") || "entry"}. Confirm karein?`;
+  }
+
   async function parseAndAdd(text: string) {
     clearWisprTimer();
     const utterance = text.trim();
-    if (!utterance) return;
+    if (!utterance || parsingLockRef.current) return;
+    parsingLockRef.current = true;
     setStatus("parsing");
     setErrorMsg("");
     const activeClarify = clarifyingEntry;
@@ -278,6 +319,7 @@ export default function Home() {
             .map((u) => `${u.sku} (+${u.added} -> ${u.quantity} ${u.unit})`)
             .join(", ");
           setToast(`Stock updated: ${summary}`);
+          if (handsFreeRef.current) speakHinglishSummary("Stock update ho gaya.");
         } else {
           setToast("Restock ke liye item aur matra bataiye (jaise '10 kg chawal stock mein add karo').");
         }
@@ -321,6 +363,9 @@ export default function Home() {
             ? "Entry update hui — ek aur sawaal baaki hai."
             : "Entry clear ho gayi, confirm kijiye.",
         );
+        if (handsFreeRef.current) {
+          speakHinglishSummary(summarizeEntryForSpeech(patched));
+        }
         return;
       }
 
@@ -334,9 +379,14 @@ export default function Home() {
       setStatus("idle");
       const unsure = drafts.some((d) => d.confidence < 0.6 || d.missing.length > 0);
       setToast(unsure ? "Entry bani hai — ek sawaal poochhna hai." : "Entry ban gayi, confirm kijiye.");
+      if (handsFreeRef.current && parsed.entries.length > 0) {
+        speakHinglishSummary(summarizeEntryForSpeech(parsed.entries[0]));
+      }
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "Kuch galat ho gaya");
       setStatus("error");
+    } finally {
+      parsingLockRef.current = false;
     }
   }
 
@@ -482,21 +532,38 @@ export default function Home() {
         className="mt-8 rounded-card border border-line bg-card p-6 shadow-sm"
       >
         <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-center sm:justify-between">
-          <MicControl
-            listening={listening}
-            disabled={!mounted || status === "parsing"}
-            adapter={speechAdapter}
-            onStart={() => {
-              setStatus("listening");
-              setErrorMsg("");
-            }}
-            onStop={() => setStatus((s) => (s === "listening" ? "idle" : s))}
-            onResult={(final, interim) => setTranscript((final + interim).trim())}
-            onError={(m) => {
-              setErrorMsg(m === "not-allowed" ? "Mic ki permission nahi mili." : `Mic error: ${m}`);
-              if (m !== "no-speech") setStatus("error");
-            }}
-          />
+          <div className="flex flex-col items-center gap-3">
+            <MicControl
+              listening={listening}
+              disabled={!mounted || status === "parsing"}
+              adapter={speechAdapter}
+              onStart={() => {
+                setStatus("listening");
+                setErrorMsg("");
+              }}
+              onStop={() => setStatus((s) => (s === "listening" ? "idle" : s))}
+              onResult={(final, interim) => setTranscript((final + interim).trim())}
+              onSessionEnd={(finalText) => {
+                if (handsFreeRef.current && finalText.trim()) {
+                  void parseAndAdd(finalText);
+                }
+              }}
+              onError={(m) => {
+                setErrorMsg(m === "not-allowed" ? "Mic ki permission nahi mili." : `Mic error: ${m}`);
+                if (m !== "no-speech") setStatus("error");
+              }}
+            />
+            <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-semibold text-ink">
+              <input
+                type="checkbox"
+                checked={handsFree}
+                onChange={(e) => setHandsFree(e.target.checked)}
+                className="h-4 w-4 rounded border-line accent-saffron"
+              />
+              <span>Hands-free mode</span>
+              <span className="font-normal text-inkSoft">(auto-submit + hi-IN bolke sunaye)</span>
+            </label>
+          </div>
           <div className="w-full sm:max-w-xs">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-sm font-semibold text-inkSoft">Live transcript</h2>

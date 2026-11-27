@@ -1,8 +1,8 @@
 # VyaparVani — Resumable P0–P3 Implementation Checklist
 
-- **Last Updated**: 2026-11-27T16:22:00Z
-- **Current Milestone**: M3 IN PROGRESS — `REC-06`–`REC-09` complete, proceeding to `REC-10`
-- **Next Resumable Step**: M3 — Implement `REC-10` (Hands-free + `hi-IN` TTS + `scripts/test-m3.mjs` CI gate)
+- **Last Updated**: 2026-11-27T16:28:00Z
+- **Current Milestone**: M3 Complete (`REC-06`–`REC-10` + `scripts/test-m3.mjs` CI gate) -> Ready for M4 (`REC-11`–`REC-14`)
+- **Next Resumable Step**: M4 — Implement `REC-11` (Expand `eval/golden.json` to 50–60 cases & strict `eval-parser.mjs`), `REC-12` (API/Store/Docker hardening), `REC-13` (UX polish & KPI), `REC-14` (90s finale E2E & final PDF sync)
 - **Repository Branch**: `feat/round2-submission` (branched from `master` @ `42448d4`)
 
 ---
@@ -89,8 +89,8 @@
 - [x] Integrate stock view/alerts and low-stock reorder pulse into `src/app/page.tsx` (ensuring copy matches shipped scope 100%)
 
 ### REC-10: True Hands-Free Mode (Auto-Submit + `hi-IN` TTS Readback)
-- [ ] Add `"Hands-free mode"` toggle in `src/app/page.tsx` / `MicControl.tsx`
-- [ ] Auto-submit transcript on speech end and speak 1-second Hinglish summary via `window.speechSynthesis` (`lang="hi-IN"`)
+- [x] Add `"Hands-free mode"` toggle in `src/app/page.tsx` / `MicControl.tsx`
+- [x] Auto-submit transcript on speech end and speak 1-second Hinglish summary via `window.speechSynthesis` (`lang="hi-IN"`)
 - [ ] Verify M3 via GitHub Actions CI (`typecheck`, `build`, `eval`, `docker-build`)
 
 ---
