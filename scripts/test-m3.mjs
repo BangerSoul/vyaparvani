@@ -270,9 +270,10 @@ await test("Playwright M3 remediation flows: multi-word SKU, product-first resto
     // Editing a confirmed entry to quantity 0 reverts status to Draft
     await newStockCard.getByRole("button", { name: "Confirm & save" }).click();
     await newStockCard.getByText("Confirmed", { exact: true }).waitFor({ timeout: 5000 });
-    await newStockCard.getByRole("button", { name: "Edit" }).click();
-    await newStockCard.getByLabel("Quantity 1").fill("0");
-    await newStockCard.getByRole("button", { name: "Save edits" }).click();
+    const topOrderCard = page.locator("article", { hasText: "Order" }).first();
+    await topOrderCard.getByRole("button", { name: "Edit" }).click();
+    await topOrderCard.getByLabel("Quantity 1").fill("0");
+    await topOrderCard.getByRole("button", { name: "Save edits" }).click();
     await newStockCard.getByText("Draft", { exact: true }).waitFor({ timeout: 5000 });
 
     // Rapid double-click on Wasooli record karo creates only 1 payment entry -> Settled
