@@ -208,7 +208,8 @@ export function normalizeDevanagari(input: string): string {
 
 function preprocessTokens(input: string): string[] {
   let s = normalizeDevanagari(input).toLowerCase();
-  // Pre-split attached currency symbols/suffixes and units before tokenization.
+  // Pre-split attached currency symbols/suffixes, units, and glued Hindi verbs before tokenization.
+  s = s.replace(/\b(bhej|likh|kar|de|rakh)(do|dena|lo|diya|dijiye)\b/g, "$1 $2");
   s = s.replace(/₹\s*(\d+(?:\.\d+)?)/g, " $1 rupaye ");
   s = s.replace(/(\d+(?:\.\d+)?)\s*\/-/g, " $1 rupaye ");
   s = s.replace(/(\d+(?:\.\d+)?)\s*(rs\.?|rupaye|rupees|rupee|inr)(?=\s|,|[.!?]|$)/g, " $1 $2 ");
@@ -324,7 +325,7 @@ function extractPartySpan(tokens: string[]): { party: string; span: [number, num
         start--;
       }
       if (start < i) {
-        const slice = tokens[i] === "ji" ? tokens.slice(start, i) : tokens.slice(start, i + 1);
+        const slice = tokens.slice(start, i + 1);
         return {
           party: titleCase(slice.join(" ")),
           span: [start, i],
@@ -415,6 +416,7 @@ export function parseDemo(input: string): ParsedEntry {
   const items: ParsedEntry["items"] = [];
   const amountTokens: number[] = [];
   let lastProduct: string | null = null;
+  let pendingUnit = "";
   let sawOrphanQty = false;
 
   function isPartyLeading(j: number): boolean {
@@ -432,6 +434,12 @@ export function parseDemo(input: string): ParsedEntry {
     }
 
     const tok = tokens[i];
+
+    if (UNITS.has(tok)) {
+      pendingUnit = normalizeUnit(tok);
+      i++;
+      continue;
+    }
 
     if (
       BRAND_PREFIXES.has(tok) &&
@@ -574,6 +582,12 @@ export function parseDemo(input: string): ParsedEntry {
     }
 
     i++;
+  }
+
+  // If an explicit unit + product appeared without a quantity (e.g. "kg chawal gupta ji ko bhejdo"),
+  // keep the item with quantity 0 so the UI asks only for quantity rather than dropping the product.
+  if (items.length === 0 && lastProduct && pendingUnit) {
+    items.push({ product: lastProduct, quantity: 0, unit: pendingUnit });
   }
 
   let amount: number | null = null;

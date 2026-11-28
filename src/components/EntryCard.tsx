@@ -12,6 +12,7 @@ type Props = {
   onDelete: (id: string) => void;
   onConfirm: (id: string) => void;
   onClarify: (entry: Entry) => void;
+  onQuickClarify?: (entry: Entry, reply: string) => void;
 };
 
 type EditDraft = {
@@ -54,8 +55,10 @@ export default function EntryCard({
   onDelete,
   onConfirm,
   onClarify,
+  onQuickClarify,
 }: Props) {
   const [editing, setEditing] = useState(false);
+  const [quickReply, setQuickReply] = useState("");
   const [draft, setDraft] = useState<EditDraft>({
     type: entry.type,
     ledgerAction: entry.ledgerAction ?? (entry.type === "ledger" ? "credit_given" : null),
@@ -199,6 +202,32 @@ export default function EntryCard({
           >
             {isClarifying ? "Jawaab neeche likh rahe hain…" : "Clarify kijiye"}
           </button>
+          {isClarifying && onQuickClarify && (
+            <form
+              className="mt-2.5 flex gap-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const val = quickReply.trim();
+                if (!val) return;
+                onQuickClarify(entry, val);
+                setQuickReply("");
+              }}
+            >
+              <input
+                type="text"
+                value={quickReply}
+                onChange={(e) => setQuickReply(e.target.value)}
+                placeholder="Yahan jawaab likhein (jaise: 5 kg ya Gupta store)"
+                className="w-full rounded-card border border-saffron/50 bg-white px-3 py-1.5 text-sm text-ink"
+              />
+              <button
+                type="submit"
+                className="shrink-0 rounded-card bg-ink px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90"
+              >
+                Update
+              </button>
+            </form>
+          )}
         </div>
       )}
 

@@ -370,3 +370,79 @@ export class WhisperApiAdapter implements SpeechInputAdapter {
     this.stopTracks();
   }
 }
+
+export const DEMO_VOICE_PHRASES = [
+  "3 packet surf Gupta store ko bhej do aur unka 200 udhaar tha",
+  "5 kg chawal Verma store ko bhej do",
+  "Sharma kirana se 300 wasooli",
+  "10 kg chawal stock mein add karo",
+] as const;
+
+export class DemoVoiceAdapter implements SpeechInputAdapter {
+  private getPhrase: () => string;
+  private timer: ReturnType<typeof setTimeout> | null = null;
+  private active = false;
+  private words: string[] = [];
+  private cursor = 0;
+  private callbacks: SpeechInputCallbacks | null = null;
+
+  constructor(getPhrase: () => string) {
+    this.getPhrase = getPhrase;
+  }
+
+  isSupported(): boolean {
+    return true;
+  }
+
+  start(callbacks: SpeechInputCallbacks): void {
+    this.clearTimer();
+    const phrase = (this.getPhrase() || DEMO_VOICE_PHRASES[0]).trim();
+    this.words = phrase.split(/\s+/).filter(Boolean);
+    this.cursor = 0;
+    this.active = true;
+    this.callbacks = callbacks;
+
+    const tick = () => {
+      if (!this.active || !this.callbacks) return;
+      if (this.cursor < this.words.length) {
+        this.cursor += 1;
+        const spokenSoFar = this.words.slice(0, this.cursor).join(" ");
+        this.callbacks.onInterim?.(spokenSoFar);
+        this.callbacks.onResult?.("", spokenSoFar);
+        this.timer = setTimeout(tick, 170);
+        return;
+      }
+      const full = this.words.join(" ");
+      const cb = this.callbacks;
+      this.active = false;
+      this.callbacks = null;
+      this.timer = null;
+      cb.onFinal?.(full);
+      cb.onResult?.(full, "");
+      cb.onEnd?.();
+    };
+
+    this.timer = setTimeout(tick, 220);
+  }
+
+  stop(): void {
+    this.clearTimer();
+    if (!this.active || !this.callbacks) return;
+    const spoken = this.words.slice(0, Math.max(1, this.cursor)).join(" ").trim();
+    const cb = this.callbacks;
+    this.active = false;
+    this.callbacks = null;
+    if (spoken) {
+      cb.onFinal?.(spoken);
+      cb.onResult?.(spoken, "");
+    }
+    cb.onEnd?.();
+  }
+
+  private clearTimer() {
+    if (this.timer) {
+      clearTimeout(this.timer);
+      this.timer = null;
+    }
+  }
+}

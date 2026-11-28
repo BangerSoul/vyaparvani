@@ -214,4 +214,39 @@ await test("REC-13: edited?: boolean & No-edit accuracy KPI pill (clarify stays 
   }
 });
 
+await test("Demo resilience: 'kg chawal gupta ji ko bhejdo', inline card Update, and Demo Voice Mic in unsupported browser", async () => {
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const context = await browser.newContext({ viewport: { width: 1024, height: 900 } });
+    const page = await context.newPage();
+    await page.goto(base, { waitUntil: "networkidle" });
+
+    // 1. "kg chawal gupta ji ko bhejdo" keeps Gupta Ji + 0 kg chawal (rice) and clarifies inline
+    await page.locator("#typed").fill("kg chawal gupta ji ko bhejdo");
+    await page.getByRole("button", { name: "Bhejiye" }).click();
+
+    const guptaCard = page.locator("article", { hasText: "Gupta Ji" }).first();
+    await guptaCard.waitFor({ timeout: 10000 });
+    await guptaCard.getByText("0 kg chawal (rice)", { exact: false }).waitFor({ timeout: 5000 });
+
+    await guptaCard.getByRole("button", { name: "Clarify kijiye" }).click();
+    await guptaCard.getByPlaceholder("Yahan jawaab likhein", { exact: false }).fill("5");
+    await guptaCard.getByRole("button", { name: "Update" }).click();
+    await guptaCard.getByText("5 kg chawal (rice)", { exact: true }).waitFor({ timeout: 5000 });
+
+    // 2. Headless browser without Web Speech API enables Demo Voice Mic + Hands-free auto-submit
+    await page.getByLabel(/Hands-free mode/i).check();
+    const micBtn = page.getByRole("button", { name: "Start recording" });
+    assert.equal(await micBtn.isDisabled(), false);
+    await micBtn.click();
+
+    // Default first Demo Voice phrase creates Gupta Store 3 packet surf + 200 udhaar
+    const streamedCard = page.locator("article", { hasText: "Gupta Store" }).first();
+    await streamedCard.waitFor({ timeout: 15000 });
+    await streamedCard.getByText("3 packet surf", { exact: true }).waitFor({ timeout: 5000 });
+  } finally {
+    await browser.close();
+  }
+});
+
 console.log(`\nAll ${passed} REC-13 (test-p3) verification checks passed!`);

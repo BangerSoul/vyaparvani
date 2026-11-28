@@ -29,6 +29,8 @@ import {
 } from "@/lib/inventory";
 import { getIstDate, type ParsedEntry } from "@/lib/schema";
 import {
+  DEMO_VOICE_PHRASES,
+  DemoVoiceAdapter,
   WebSpeechAdapter,
   WhisperApiAdapter,
   type SpeechInputAdapter,
@@ -91,6 +93,9 @@ export default function Home() {
   const [handsFree, setHandsFree] = useState(false);
   const [showDictionary, setShowDictionary] = useState(false);
   const [useWhisperFallback, setUseWhisperFallback] = useState(false);
+  const [demoVoiceMode, setDemoVoiceMode] = useState(false);
+  const [demoPhraseIdx, setDemoPhraseIdx] = useState(0);
+  const [wisprPending, setWisprPending] = useState(false);
   const textRef = useRef<HTMLInputElement>(null);
   const wisprTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const parsingLockRef = useRef(false);
@@ -104,12 +109,32 @@ export default function Home() {
       clearTimeout(wisprTimerRef.current);
       wisprTimerRef.current = null;
     }
+    setWisprPending(false);
   }, []);
 
   const clarifyingEntry = useMemo(
     () => entries.find((e) => e.id === clarifyingEntryId) ?? null,
     [entries, clarifyingEntryId],
   );
+
+  const demoVoicePhrase = useMemo(() => {
+    if (clarifyingEntry) {
+      if (clarifyingEntry.missing.includes("quantity") && clarifyingEntry.party) {
+        return "5 kg";
+      }
+      if (clarifyingEntry.type === "ledger" && clarifyingEntry.missing.includes("amount")) {
+        return "500 rupaye";
+      }
+      if (clarifyingEntry.missing.includes("party")) {
+        return "Verma store";
+      }
+      return "5 kg Verma store";
+    }
+    return DEMO_VOICE_PHRASES[demoPhraseIdx % DEMO_VOICE_PHRASES.length];
+  }, [clarifyingEntry, demoPhraseIdx]);
+
+  const demoVoicePhraseRef = useRef(demoVoicePhrase);
+  demoVoicePhraseRef.current = demoVoicePhrase;
 
   useEffect(() => {
     setMounted(true);
@@ -135,10 +160,14 @@ export default function Home() {
     if (mounted && keyReady && (!webSpeechSupported || useWhisperFallback)) {
       return new WhisperApiAdapter({ getApiKey: () => apiKeyRef.current });
     }
+    if (mounted && !keyReady && (demoVoiceMode || !webSpeechSupported)) {
+      return new DemoVoiceAdapter(() => demoVoicePhraseRef.current);
+    }
     return new WebSpeechAdapter("hi-IN");
-  }, [mounted, keyReady, webSpeechSupported, useWhisperFallback]);
+  }, [mounted, keyReady, webSpeechSupported, useWhisperFallback, demoVoiceMode]);
 
   const usingWhisper = mounted && keyReady && (!webSpeechSupported || useWhisperFallback);
+  const usingDemoVoice = mounted && !keyReady && (demoVoiceMode || !webSpeechSupported);
 
   useEffect(() => {
     if (wisprMode) {
@@ -160,7 +189,7 @@ export default function Home() {
       return;
     }
     if (!/^sk-\S{3,}$/.test(key)) {
-      const msg = "Galat API key — OpenAI key 'sk-' se shuru honi chahiye.";
+      const msg = "Galat API key — OpenAI key 'sk-' se shuru honi chahiye (demo ke liye key zaroori nahi hai).";
       setKeyError(msg);
       setToast(msg);
       return;
@@ -314,14 +343,19 @@ export default function Home() {
     return `${party}, ${parts.join(" aur ") || "entry"}. Confirm karein?`;
   }
 
-  async function parseAndAdd(text: string, options?: { resetClarify?: boolean }) {
+  async function parseAndAdd(
+    text: string,
+    options?: { resetClarify?: boolean; targetClarifyEntry?: Entry },
+  ) {
     clearWisprTimer();
     const utterance = text.trim();
     if (!utterance || parsingLockRef.current) return;
     parsingLockRef.current = true;
     setStatus("parsing");
     setErrorMsg("");
-    const activeClarify = options?.resetClarify ? null : clarifyingEntry;
+    const activeClarify = options?.resetClarify
+      ? null
+      : options?.targetClarifyEntry ?? clarifyingEntry;
     if (options?.resetClarify) {
       setClarifyingEntryId(null);
     }
@@ -359,6 +393,9 @@ export default function Home() {
       }
       const parsed: { entries: ParsedEntry[]; mode?: "demo" | "model" } = await res.json();
       const mode = parsed.mode === "model" ? "model" : "demo";
+      if (!activeClarify && !isRestock && usingDemoVoice && !clarifyingEntry) {
+        setDemoPhraseIdx((idx) => (idx + 1) % DEMO_VOICE_PHRASES.length);
+      }
 
       if (isRestock) {
         const restockItems = parsed.entries.flatMap((e) => e.items);
@@ -516,7 +553,8 @@ export default function Home() {
     const el = textRef.current;
     if (el) {
       el.value = "";
-      el.focus();
+      el.focus({ preventScroll: true });
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
     }
     setToast(entry.clarification || "Bataiye — kya aur kitna?");
   }
@@ -546,8 +584,9 @@ export default function Home() {
             API key set nahi hai — abhi demo parser chal raha hai.
           </p>
           <p className="mt-1 text-sm text-[#8A6B22]">
-            Voice processing ke liye apni OpenAI key yahan daaliye. Key sirf is browser session mein
-            rehti hai, server par save nahi hoti.
+            Bina kisi API key ke saare demo features chal rahe hain. (Optional: live GPT-4o-mini +
+            Whisper ke liye OpenAI <code className="font-mono">sk-...</code> key daalein — sirf is
+            browser session mein rehti hai, server par save nahi hoti.)
           </p>
           <form className="mt-3 flex flex-col gap-2 sm:flex-row" onSubmit={saveKey}>
             <input
@@ -614,6 +653,23 @@ export default function Home() {
                 }
               }}
               onError={(m) => {
+                const cloudBlocked =
+                  m === "network" ||
+                  m === "service-not-allowed" ||
+                  m === "language-not-supported" ||
+                  m === "speech-recognition-unsupported";
+                if (cloudBlocked) {
+                  setErrorMsg("");
+                  setStatus("idle");
+                  if (keyReady) {
+                    setUseWhisperFallback(true);
+                    setToast("Browser cloud speech unavailable — Whisper ASR ON. Mic dubara dabayein!");
+                  } else {
+                    setDemoVoiceMode(true);
+                    setToast("Browser speech blocked — Demo Voice Mic active! Mic dabayein.");
+                  }
+                  return;
+                }
                 setErrorMsg(m === "not-allowed" ? "Mic ki permission nahi mili." : `Mic error: ${m}`);
                 if (m !== "no-speech") setStatus("error");
               }}
@@ -632,23 +688,46 @@ export default function Home() {
           <div className="w-full sm:max-w-xs">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-sm font-semibold text-inkSoft">Live transcript</h2>
-              {mounted && keyReady && (
-                <button
-                  type="button"
-                  aria-pressed={usingWhisper}
-                  onClick={() => setUseWhisperFallback((v) => !v)}
-                  disabled={!webSpeechSupported}
-                  className={[
-                    "rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors",
-                    usingWhisper
-                      ? "border-saffron bg-[#FBF1E3] text-saffronDeep"
-                      : "border-line bg-surface text-inkSoft hover:bg-[#F3EDE0]",
-                    !webSpeechSupported ? "cursor-default" : "",
-                  ].join(" ")}
-                >
-                  {usingWhisper ? "Whisper ASR ON" : "Whisper ASR"}
-                </button>
-              )}
+              <div className="flex flex-wrap items-center gap-1.5">
+                {mounted && !keyReady && (
+                  <button
+                    type="button"
+                    aria-pressed={usingDemoVoice}
+                    onClick={() => {
+                      setErrorMsg("");
+                      setStatus("idle");
+                      setDemoVoiceMode((v) => !v);
+                    }}
+                    disabled={!webSpeechSupported}
+                    className={[
+                      "rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors",
+                      usingDemoVoice
+                        ? "border-saffron bg-[#FBF1E3] text-saffronDeep"
+                        : "border-line bg-surface text-inkSoft hover:bg-[#F3EDE0]",
+                      !webSpeechSupported ? "cursor-default" : "",
+                    ].join(" ")}
+                  >
+                    {usingDemoVoice ? "Demo Voice Mic ON" : "Demo Voice Mic"}
+                  </button>
+                )}
+                {mounted && keyReady && (
+                  <button
+                    type="button"
+                    aria-pressed={usingWhisper}
+                    onClick={() => setUseWhisperFallback((v) => !v)}
+                    disabled={!webSpeechSupported}
+                    className={[
+                      "rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors",
+                      usingWhisper
+                        ? "border-saffron bg-[#FBF1E3] text-saffronDeep"
+                        : "border-line bg-surface text-inkSoft hover:bg-[#F3EDE0]",
+                      !webSpeechSupported ? "cursor-default" : "",
+                    ].join(" ")}
+                  >
+                    {usingWhisper ? "Whisper ASR ON" : "Whisper ASR"}
+                  </button>
+                )}
+              </div>
             </div>
             <p
               aria-live="polite"
@@ -656,6 +735,23 @@ export default function Home() {
             >
               {transcript || <span className="text-inkSoft">Bolna shuru kijiye…</span>}
             </p>
+            {usingDemoVoice && (
+              <div className="mt-2 rounded-card border border-line bg-surface px-2.5 py-2 text-xs text-inkSoft">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-semibold text-ink">Demo Voice phrase:</span>
+                  <button
+                    type="button"
+                    onClick={() => setDemoPhraseIdx((i) => (i + 1) % DEMO_VOICE_PHRASES.length)}
+                    className="font-semibold text-saffronDeep underline hover:opacity-80"
+                  >
+                    Next phrase
+                  </button>
+                </div>
+                <p className="mt-0.5 truncate text-ink" title={demoVoicePhrase}>
+                  “{demoVoicePhrase}”
+                </p>
+              </div>
+            )}
             {transcript && (
               <button
                 type="button"
@@ -769,9 +865,11 @@ export default function Home() {
           <label htmlFor="typed" className="block text-sm font-medium text-inkSoft">
             {clarifyingEntry
               ? "Is entry ka jawaab boliye ya type kijiye"
-              : wisprMode
-                ? "Wispr Flow active — seedha boliye, rukne par auto-parse hoga"
-                : "Ya type karke boliye (mic na chale to)"}
+              : wisprPending
+                ? "Pause detect hua — rukne par auto-parse hoga (likhte rahiye ya Enter dabayein)"
+                : wisprMode
+                  ? "Wispr Flow active — poora vaakya boliye, 2.5s rukne par auto-parse hoga"
+                  : "Ya type karke boliye (mic na chale to)"}
           </label>
           <div className="mt-2 flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
             <input
@@ -782,11 +880,14 @@ export default function Home() {
                 if (!wisprMode || status === "parsing") return;
                 const val = e.target.value.trim();
                 const words = val.split(/\s+/).filter(Boolean).length;
-                if (words >= 2 || /[.!?।]$/.test(val)) {
+                const endsSentence = /[.!?।]$/.test(val);
+                if (clarifyingEntry ? words >= 1 : words >= 3 || endsSentence) {
+                  setWisprPending(true);
+                  const delayMs = endsSentence ? 700 : clarifyingEntry ? 1800 : 2600;
                   wisprTimerRef.current = setTimeout(() => {
                     const current = readTyped();
                     if (current) void parseAndAdd(current);
-                  }, 1100);
+                  }, delayMs);
                 }
               }}
               className="w-full rounded-card border border-line bg-surface px-3 py-2 text-base text-ink"
@@ -824,9 +925,22 @@ export default function Home() {
         </form>
 
         {status === "error" && (
-          <p role="alert" className="mt-4 rounded-card border border-[#D8A49A] bg-[#F8E9E5] p-3 text-sm text-[#A03325]">
-            {errorMsg} — dobara koshish kijiye.
-          </p>
+          <div role="alert" className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-card border border-[#D8A49A] bg-[#F8E9E5] p-3 text-sm text-[#A03325]">
+            <span>{errorMsg} — dobara koshish kijiye.</span>
+            {!keyReady && !usingDemoVoice && (
+              <button
+                type="button"
+                onClick={() => {
+                  setErrorMsg("");
+                  setStatus("idle");
+                  setDemoVoiceMode(true);
+                }}
+                className="rounded border border-[#A03325]/30 bg-white px-2.5 py-1 text-xs font-semibold text-[#A03325] hover:bg-[#FAF0ED]"
+              >
+                Use Demo Voice Mic
+              </button>
+            )}
+          </div>
         )}
       </section>
 
@@ -1138,6 +1252,9 @@ export default function Home() {
                       onDelete={deleteEntry}
                       onConfirm={confirmEntry}
                       onClarify={clarify}
+                      onQuickClarify={(target, reply) =>
+                        void parseAndAdd(reply, { targetClarifyEntry: target })
+                      }
                     />
                   ))}
                 </div>
@@ -1161,6 +1278,9 @@ export default function Home() {
                       onDelete={deleteEntry}
                       onConfirm={confirmEntry}
                       onClarify={clarify}
+                      onQuickClarify={(target, reply) =>
+                        void parseAndAdd(reply, { targetClarifyEntry: target })
+                      }
                     />
                   ))}
                 </div>
