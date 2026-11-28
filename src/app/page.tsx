@@ -655,12 +655,14 @@ export default function Home() {
                 }
               }}
               onError={(m) => {
-                const cloudBlocked =
+                const browserMicUnavailable =
                   m === "network" ||
                   m === "service-not-allowed" ||
+                  m === "audio-capture" ||
                   m === "language-not-supported" ||
-                  m === "speech-recognition-unsupported";
-                if (cloudBlocked) {
+                  m === "speech-recognition-unsupported" ||
+                  (!keyReady && m === "not-allowed");
+                if (browserMicUnavailable) {
                   setErrorMsg("");
                   setStatus("idle");
                   if (keyReady) {
@@ -670,7 +672,7 @@ export default function Home() {
                   } else {
                     setDemoVoiceMode(true);
                     setAutoStartMicKey((k) => k + 1);
-                    setToast("Browser cloud speech blocked — Demo Voice Mic chalu ho raha hai.");
+                    setToast(`Browser mic unavailable (${m}) — Demo Voice Mic chalu ho raha hai.`);
                   }
                   return;
                 }
