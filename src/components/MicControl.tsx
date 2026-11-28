@@ -12,6 +12,7 @@ type Props = {
   onError: (message: string) => void;
   disabled?: boolean;
   adapter?: SpeechInputAdapter;
+  autoStartKey?: number;
 };
 
 export default function MicControl({
@@ -23,6 +24,7 @@ export default function MicControl({
   onError,
   disabled,
   adapter,
+  autoStartKey = 0,
 }: Props) {
   const [supported, setSupported] = useState(true);
   const [transcribing, setTranscribing] = useState(false);
@@ -31,33 +33,20 @@ export default function MicControl({
   const latestInterimRef = useRef("");
   const sessionActiveRef = useRef(false);
   const sessionIdRef = useRef(0);
+  const lastAutoStartKeyRef = useRef(0);
 
   // Latest callbacks without re-creating the recognition adapter on re-render.
-  const cbRef = useRef({ onResult, onStop, onSessionEnd, onError });
-  cbRef.current = { onResult, onStop, onSessionEnd, onError };
+  const cbRef = useRef({ onResult, onStop, onSessionEnd, onError, onStart });
+  cbRef.current = { onResult, onStop, onSessionEnd, onError, onStart };
 
-  useEffect(() => {
-    const impl = adapter ?? new WebSpeechAdapter("hi-IN");
-    adapterRef.current = impl;
-    setSupported(impl.isSupported());
-    return () => {
-      sessionIdRef.current += 1;
-      sessionActiveRef.current = false;
-      setTranscribing(false);
-      impl.stop();
-    };
-  }, [adapter]);
-
-  function start() {
-    if (transcribing) return;
-    const impl = adapterRef.current;
+  function beginSession(impl: SpeechInputAdapter) {
     if (!impl || !impl.isSupported()) return;
     const sid = ++sessionIdRef.current;
     finalTextRef.current = "";
     latestInterimRef.current = "";
     sessionActiveRef.current = true;
     setTranscribing(false);
-    onStart();
+    cbRef.current.onStart();
     impl.start({
       onInterim: (interim) => {
         if (sid !== sessionIdRef.current) return;
@@ -92,6 +81,29 @@ export default function MicControl({
         cbRef.current.onError(msg);
       },
     });
+  }
+
+  useEffect(() => {
+    const impl = adapter ?? new WebSpeechAdapter("hi-IN");
+    adapterRef.current = impl;
+    setSupported(impl.isSupported());
+    if (autoStartKey > 0 && autoStartKey !== lastAutoStartKeyRef.current) {
+      lastAutoStartKeyRef.current = autoStartKey;
+      beginSession(impl);
+    }
+    return () => {
+      sessionIdRef.current += 1;
+      sessionActiveRef.current = false;
+      setTranscribing(false);
+      impl.stop();
+    };
+  }, [adapter, autoStartKey]);
+
+  function start() {
+    if (transcribing) return;
+    const impl = adapterRef.current;
+    if (!impl || !impl.isSupported()) return;
+    beginSession(impl);
   }
 
   function stop() {

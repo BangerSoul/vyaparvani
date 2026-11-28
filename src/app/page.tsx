@@ -95,6 +95,7 @@ export default function Home() {
   const [useWhisperFallback, setUseWhisperFallback] = useState(false);
   const [demoVoiceMode, setDemoVoiceMode] = useState(false);
   const [demoPhraseIdx, setDemoPhraseIdx] = useState(0);
+  const [autoStartMicKey, setAutoStartMicKey] = useState(0);
   const [wisprPending, setWisprPending] = useState(false);
   const textRef = useRef<HTMLInputElement>(null);
   const wisprTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -393,9 +394,6 @@ export default function Home() {
       }
       const parsed: { entries: ParsedEntry[]; mode?: "demo" | "model" } = await res.json();
       const mode = parsed.mode === "model" ? "model" : "demo";
-      if (!activeClarify && !isRestock && usingDemoVoice && !clarifyingEntry) {
-        setDemoPhraseIdx((idx) => (idx + 1) % DEMO_VOICE_PHRASES.length);
-      }
 
       if (isRestock) {
         const restockItems = parsed.entries.flatMap((e) => e.items);
@@ -641,6 +639,7 @@ export default function Home() {
               listening={listening}
               disabled={!mounted || status === "parsing"}
               adapter={speechAdapter}
+              autoStartKey={autoStartMicKey}
               onStart={() => {
                 setStatus("listening");
                 setErrorMsg("");
@@ -648,6 +647,9 @@ export default function Home() {
               onStop={() => setStatus((s) => (s === "listening" ? "idle" : s))}
               onResult={(final, interim) => setTranscript((final + interim).trim())}
               onSessionEnd={(finalText) => {
+                if (usingDemoVoice && !clarifyingEntry && finalText.trim()) {
+                  setDemoPhraseIdx((idx) => (idx + 1) % DEMO_VOICE_PHRASES.length);
+                }
                 if (handsFreeRef.current && finalText.trim()) {
                   void parseAndAdd(finalText);
                 }
@@ -663,10 +665,12 @@ export default function Home() {
                   setStatus("idle");
                   if (keyReady) {
                     setUseWhisperFallback(true);
-                    setToast("Browser cloud speech unavailable — Whisper ASR ON. Mic dubara dabayein!");
+                    setAutoStartMicKey((k) => k + 1);
+                    setToast("Browser cloud speech blocked — Whisper ASR chalu ho raha hai.");
                   } else {
                     setDemoVoiceMode(true);
-                    setToast("Browser speech blocked — Demo Voice Mic active! Mic dabayein.");
+                    setAutoStartMicKey((k) => k + 1);
+                    setToast("Browser cloud speech blocked — Demo Voice Mic chalu ho raha hai.");
                   }
                   return;
                 }
