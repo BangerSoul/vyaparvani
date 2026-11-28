@@ -234,8 +234,12 @@ await test("Demo resilience: 'kg chawal gupta ji ko bhejdo', inline card Update,
     await guptaCard.getByRole("button", { name: "Update" }).click();
     await guptaCard.getByText("5 kg chawal (rice)", { exact: true }).waitFor({ timeout: 5000 });
 
-    // 2. Headless browser without Web Speech API enables Demo Voice Mic + Hands-free auto-submit
+    // 2. Demo Voice Mic pill + Hands-free auto-submit
     await page.getByLabel(/Hands-free mode/i).check();
+    const demoMicToggle = page.getByRole("button", { name: "Demo Voice Mic", exact: true });
+    await demoMicToggle.click();
+    await page.getByRole("button", { name: "Demo Voice Mic ON", exact: true }).waitFor({ timeout: 5000 });
+
     const micBtn = page.getByRole("button", { name: "Start recording" });
     assert.equal(await micBtn.isDisabled(), false);
     await micBtn.click();
@@ -244,6 +248,37 @@ await test("Demo resilience: 'kg chawal gupta ji ko bhejdo', inline card Update,
     const streamedCard = page.locator("article", { hasText: "Gupta Store" }).first();
     await streamedCard.waitFor({ timeout: 15000 });
     await streamedCard.getByText("3 packet surf", { exact: true }).waitFor({ timeout: 5000 });
+
+    // 3. Simulate Brave cloud speech 'network' error -> 1-click auto-fallback to Demo Voice Mic
+    await page.evaluate(() => {
+      class FakeBlockedSpeechRecognition {
+        lang = "hi-IN";
+        interimResults = true;
+        continuous = true;
+        onresult = null;
+        onend = null;
+        onerror = null;
+        start() {
+          setTimeout(() => {
+            this.onerror?.({ error: "network" });
+            this.onend?.();
+          }, 50);
+        }
+        stop() {}
+        abort() {}
+      }
+      window.SpeechRecognition = FakeBlockedSpeechRecognition;
+      window.webkitSpeechRecognition = FakeBlockedSpeechRecognition;
+    });
+    // Switch Demo Voice Mic back off to return to Browser Speech adapter, then click Mic
+    await page.getByRole("button", { name: "Demo Voice Mic ON", exact: true }).click();
+    await page.getByRole("button", { name: "Demo Voice Mic", exact: true }).waitFor({ timeout: 5000 });
+    await page.getByRole("button", { name: "Start recording" }).click();
+
+    // Auto-fallback runs phrase #2 ("5 kg chawal Verma store ko bhej do") without any red error box
+    const fallbackCard = page.locator("article", { hasText: "Verma Store" }).first();
+    await fallbackCard.waitFor({ timeout: 15000 });
+    assert.equal(await page.locator('[role="alert"]').filter({ hasText: "Mic error" }).count(), 0);
   } finally {
     await browser.close();
   }
